@@ -44,90 +44,83 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetail 
   };
 
   return (
-    <div className="product-card" onClick={() => onOpenDetail(product)}>
+    <div
+      className="group flex cursor-pointer flex-col overflow-hidden rounded-[20px] border-[1.5px] border-[#E7DEC8] bg-white transition-all duration-200 hover:border-[#D8CEB9] hover:shadow-sm"
+      onClick={() => onOpenDetail(product)}
+    >
 
       {/* ── Image ── */}
-      <div className="product-card-img-wrap">
+      <div className="relative aspect-square overflow-hidden bg-[#F4EFE6]">
         <img
+          className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
           src={(product.images && product.images[0]) || 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80'}
           alt={product.name}
         />
 
         {/* Badges */}
-        <div className="product-card-badges">
-          {product.is_bestseller && <span className="badge badge-terra">Bestseller</span>}
-          {discountPct > 0      && <span className="badge badge-amber">{discountPct}% OFF</span>}
-          {product.is_new_arrival && <span className="badge badge-green">New</span>}
+        <div className="absolute left-2 top-2 flex flex-col gap-1">
+          {product.is_bestseller && <span className="inline-block rounded-full bg-[#B35427] px-2 py-[3px] text-[10px] font-bold tracking-[.03em] text-white">Bestseller</span>}
+          {discountPct > 0 && <span className="inline-block rounded-full bg-[#D97706] px-2 py-[3px] text-[10px] font-bold tracking-[.03em] text-white">{discountPct}% OFF</span>}
+          {product.is_new_arrival && <span className="inline-block rounded-full bg-[#1E3A27] px-2 py-[3px] text-[10px] font-bold tracking-[.03em] text-white">New</span>}
         </div>
 
         {/* Wishlist */}
         <button
-          className={`product-card-wishlist${isFavorited ? ' active' : ''}`}
+          className={`absolute right-2 top-2 flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[#E7DEC8] bg-white transition-all hover:border-red-500 hover:bg-red-100 ${
+            isFavorited ? 'border-red-500 bg-red-100' : ''
+          }`}
           onClick={handleWishlist}
           title={isFavorited ? 'Remove from wishlist' : 'Add to wishlist'}
         >
           <Heart
             size={14}
-            style={isFavorited ? { fill: '#EF4444', color: '#EF4444' } : { color: 'var(--text-mid)' }}
+            className={isFavorited ? 'fill-red-500 text-red-500' : 'text-[#4B5563]'}
           />
         </button>
 
         {/* Organic tag */}
-        <div style={{
-          position: 'absolute', bottom: 8, left: 8,
-          display: 'flex', alignItems: 'center', gap: 4,
-          background: 'rgba(255,255,255,.9)', backdropFilter: 'blur(6px)',
-          padding: '3px 8px', borderRadius: 6,
-          fontSize: 10, fontWeight: 700, color: 'var(--green)',
-        }}>
-          <Sparkles size={11} color="var(--amber)" />
+        <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-md bg-white/90 px-2 py-[3px] text-[10px] font-bold text-[#1E3A27] backdrop-blur-md">
+          <Sparkles size={11} className="text-[#D97706]" />
           Natural &amp; Pure
         </div>
       </div>
 
       {/* ── Body ── */}
-      <div className="product-card-body">
+      <div className="flex flex-1 flex-col p-3">
 
         {/* Category & Rating row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <span className="product-card-category">{product.category_name || 'Traditional'}</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 700, color: '#D97706' }}>
-            <Star size={11} style={{ fill: '#F59E0B', color: '#F59E0B' }} />
+        <div className="mb-1 flex items-center justify-between">
+          <span className="mb-1 text-[10px] font-bold uppercase tracking-[.07em] text-[#B35427]">{product.category_name || 'Traditional'}</span>
+          <span className="flex items-center gap-[3px] text-[11px] font-bold text-[#D97706]">
+            <Star size={11} className="fill-amber-500 text-amber-500" />
             {product.rating || '5.0'}
           </span>
         </div>
 
         {/* Name */}
-        <div className="product-card-name">{product.name}</div>
+        <div className="mb-1 font-[family-name:'Playfair_Display',Georgia,serif] text-[15px] font-bold leading-[1.3] text-[#1A2318]">{product.name}</div>
 
         {/* Tagline */}
-        <div className="product-card-tagline"
-          style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        <div className="mb-[10px] line-clamp-2 flex-1 text-[11.5px] leading-[1.4] text-[#4B5563]">
           {product.tagline || product.short_description}
         </div>
 
         {/* Variant selector */}
         {product.variants && product.variants.length > 1 && (
-          <div style={{ marginBottom: 10 }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-light)', marginBottom: 5 }}>
+          <div className="mb-[10px]" onClick={e => e.stopPropagation()}>
+            <div className="mb-[5px] text-[10px] font-bold uppercase tracking-[.06em] text-[#9CA3AF]">
               Size:
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            <div className="flex flex-wrap gap-[5px]">
               {product.variants.map(v => (
                 <button
                   key={v.id}
                   onClick={() => setSelectedVariant(v)}
-                  style={{
-                    padding: '4px 9px',
-                    borderRadius: 6,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    border: '1.5px solid',
-                    borderColor: selectedVariant.id === v.id ? 'var(--green)' : 'var(--border-mid)',
-                    background: selectedVariant.id === v.id ? 'var(--green)' : 'var(--cream)',
-                    color: selectedVariant.id === v.id ? '#fff' : 'var(--text-dark)',
-                    transition: 'all .12s',
-                  }}
+                  className={`rounded-md border-[1.5px] px-[9px] py-1 text-[11px] font-bold transition-all ${
+                    selectedVariant.id === v.id
+                      ? 'border-[#1E3A27] bg-[#1E3A27] text-white'
+                      : 'border-[#D8CEB9] bg-[#FAF7F2] text-[#1A2318]'
+                  }`}
                 >
                   {v.title}
                 </button>
@@ -137,18 +130,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetail 
         )}
 
         {/* Footer: price + add btn */}
-        <div className="product-card-footer">
-          <div className="product-card-price">
-            <span className="product-card-price-main">₹{currentPrice}</span>
+        <div className="mt-auto flex items-center justify-between gap-2">
+          <div className="flex flex-col">
+            <span className="text-[17px] font-extrabold leading-none text-[#1E3A27]">₹{currentPrice}</span>
             {comparePrice && comparePrice > currentPrice && (
-              <span className="product-card-price-compare">₹{comparePrice}</span>
+              <span className="text-[11px] text-[#9CA3AF] line-through">₹{comparePrice}</span>
             )}
           </div>
 
           <button
-            className="product-card-add"
+            className={`flex shrink-0 items-center gap-1 rounded-lg px-3 py-[7px] text-xs font-bold text-white transition-all hover:bg-[#2B5336] ${
+              added ? 'bg-green-600' : 'bg-[#1E3A27]'
+            }`}
             onClick={handleAdd}
-            style={added ? { background: '#16A34A' } : {}}
           >
             {added ? <Check size={13} /> : <ShoppingBag size={13} />}
             <span>{added ? 'Added' : 'Add'}</span>

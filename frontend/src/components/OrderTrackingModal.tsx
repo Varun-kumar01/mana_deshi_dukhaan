@@ -1,16 +1,11 @@
 import React from 'react';
-import { 
-  X, 
-  CheckCircle2, 
-  Package, 
-  Truck, 
-  MapPin, 
-  Phone, 
-  Calendar, 
-  Clock, 
+import {
+  CheckCircle2,
+  MapPin,
+  Phone,
+  Printer,
   Store,
-  ExternalLink,
-  Printer
+  X,
 } from 'lucide-react';
 import { Order } from '../types';
 
@@ -20,196 +15,302 @@ interface OrderTrackingModalProps {
   whatsappUrl?: string;
 }
 
+const statuses = [
+  'Pending',
+  'Confirmed',
+  'Packed',
+  'Shipped',
+  'Delivered',
+];
+
 export const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
   order,
   onClose,
-  whatsappUrl
+  whatsappUrl,
 }) => {
   if (!order) return null;
 
-  const statuses = ['Pending', 'Confirmed', 'Packed', 'Shipped', 'Delivered'];
-  const currentIndex = statuses.indexOf(order.order_status) !== -1
-    ? statuses.indexOf(order.order_status)
-    : 1;
+  const statusIndex = statuses.indexOf(order.order_status);
+  const currentIndex = statusIndex >= 0 ? statusIndex : 1;
 
-  const defaultWaUrl = whatsappUrl || `https://wa.me/919951118687?text=Hi%20Swathi,%20inquiring%20about%20my%20order%20*${order.order_number}*`;
+  const progressPercent =
+    currentIndex === 0
+      ? 0
+      : (currentIndex / (statuses.length - 1)) * 100;
+
+  const defaultWaUrl =
+    whatsappUrl ||
+    `https://wa.me/919951118687?text=Hi%20Swathi,%20inquiring%20about%20my%20order%20*${order.order_number}*`;
+
+  const deliveryAddress = order.delivery_address;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-fadeIn">
-      <div className="relative bg-[#FAF7F2] rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-[#E7DEC8] max-h-[92vh] flex flex-col">
-        
+    <div
+      className="fixed inset-0 z-[500] flex items-center justify-center overflow-y-auto bg-black/65 p-3 backdrop-blur-sm sm:p-6"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div className="relative flex max-h-[94dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-[#E7DEC8] bg-[#FAF7F2] shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:px-6 bg-[#1E3A27] text-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center font-bold">
-              <CheckCircle2 className="w-6 h-6 text-[#FBBF24]" />
+        <div className="flex shrink-0 items-center justify-between bg-[#1E3A27] px-4 py-4 text-white sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10">
+              <CheckCircle2
+                size={22}
+                className="text-amber-300"
+              />
             </div>
-            <div>
-              <div className="text-xs uppercase tracking-wider text-emerald-300 font-bold">
+
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 sm:text-xs">
                 Order Placed Successfully!
-              </div>
-              <h3 className="font-serif-display font-extrabold text-xl">
+              </p>
+
+              <h3 className="mt-0.5 truncate font-display text-lg font-extrabold sm:text-xl">
                 Order ID: {order.order_number}
               </h3>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+            aria-label="Close order tracking"
+            className="ml-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
           >
-            <X className="w-5 h-5" />
+            <X size={20} />
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5">
-          
-          {/* Status Timeline Stepper */}
-          <div className="p-4 bg-white rounded-2xl border border-[#E7DEC8] shadow-sm">
-            <div className="text-xs font-bold uppercase tracking-wider text-stone-600 mb-4">
-              Live Order Status Timeline:
+        {/* Content */}
+        <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
+          {/* Status timeline */}
+          <section className="rounded-2xl border border-[#E7DEC8] bg-white p-4 shadow-sm sm:p-5">
+            <div className="mb-5 text-xs font-bold uppercase tracking-wider text-stone-600">
+              Live Order Status Timeline
             </div>
 
-            <div className="relative flex items-center justify-between">
-              {/* Line connector */}
-              <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-1 bg-stone-200 z-0" />
+            <div className="relative px-1 sm:px-3">
+              {/* Background line */}
+              <div className="absolute left-[10%] right-[10%] top-4 h-1 -translate-y-1/2 rounded-full bg-stone-200" />
+
+              {/* Progress line */}
               <div
-                className="absolute left-4 top-1/2 -translate-y-1/2 h-1 bg-[#1E3A27] transition-all duration-500 z-0"
-                style={{ width: `${(currentIndex / (statuses.length - 1)) * 90}%` }}
+                className="absolute left-[10%] top-4 h-1 -translate-y-1/2 rounded-full bg-[#1E3A27] transition-all duration-500"
+                style={{
+                  width: `${progressPercent * 0.8}%`,
+                }}
               />
 
-              {statuses.map((step, idx) => {
-                const isPassed = idx <= currentIndex;
-                const isCurrent = idx === currentIndex;
+              <div className="relative z-10 flex items-start justify-between">
+                {statuses.map((status, index) => {
+                  const isPassed = index <= currentIndex;
+                  const isCurrent = index === currentIndex;
 
-                return (
-                  <div key={step} className="relative z-10 flex flex-col items-center">
+                  return (
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
-                        isCurrent
-                          ? 'bg-[#D97706] text-white ring-4 ring-[#D97706]/20 scale-110 shadow-md'
-                          : isPassed
-                          ? 'bg-[#1E3A27] text-white shadow-sm'
-                          : 'bg-stone-200 text-stone-500'
-                      }`}
+                      key={status}
+                      className="flex min-w-0 flex-1 flex-col items-center"
                     >
-                      {idx + 1}
-                    </div>
-                    <span
-                      className={`text-[10px] sm:text-[11px] font-bold mt-1.5 whitespace-nowrap ${
-                        isCurrent
-                          ? 'text-[#D97706]'
-                          : isPassed
-                          ? 'text-[#1E3A27]'
-                          : 'text-stone-400'
-                      }`}
-                    >
-                      {step}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold transition-all sm:h-9 sm:w-9 sm:text-xs ${
+                          isCurrent
+                            ? 'scale-110 bg-[#D97706] text-white shadow-md ring-4 ring-[#D97706]/20'
+                            : isPassed
+                              ? 'bg-[#1E3A27] text-white shadow-sm'
+                              : 'bg-stone-200 text-stone-500'
+                        }`}
+                      >
+                        {isPassed && index < currentIndex ? (
+                          <CheckCircle2 size={16} />
+                        ) : (
+                          index + 1
+                        )}
+                      </div>
 
-          {/* Delivery & Store Dispatch Info */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div className="p-3.5 bg-white rounded-2xl border border-[#E7DEC8] space-y-1.5 text-xs text-stone-600">
+                      <span
+                        className={`mt-2 w-full break-words px-0.5 text-center text-[9px] font-bold leading-tight sm:text-[11px] ${
+                          isCurrent
+                            ? 'text-[#D97706]'
+                            : isPassed
+                              ? 'text-[#1E3A27]'
+                              : 'text-stone-400'
+                        }`}
+                      >
+                        {status}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
+          {/* Delivery + store */}
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <section className="space-y-2 rounded-2xl border border-[#E7DEC8] bg-white p-4 text-xs text-stone-600">
               <div className="flex items-center gap-1.5 font-bold text-stone-800">
-                <MapPin className="w-4 h-4 text-[#B35427]" />
+                <MapPin
+                  size={16}
+                  className="text-[#B35427]"
+                />
                 <span>Delivery Address</span>
               </div>
-              <p className="font-semibold text-stone-800">{order.customer_name}</p>
-              <p>{order.delivery_address.flat_house}, {order.delivery_address.streetArea || order.delivery_address.street_area}</p>
-              <p>{order.delivery_address.city} - {order.delivery_address.pincode}</p>
-              <p className="text-[#1E3A27] font-semibold">Phone: {order.customer_phone}</p>
-            </div>
 
-            <div className="p-3.5 bg-white rounded-2xl border border-[#E7DEC8] space-y-1.5 text-xs text-stone-600">
+              <div className="pt-1">
+                <p className="font-bold text-stone-800">
+                  {order.customer_name}
+                </p>
+
+                <p className="mt-1 leading-5">
+                  {deliveryAddress.flat_house},{' '}
+                  {deliveryAddress.streetArea ||
+                    deliveryAddress.street_area}
+                </p>
+
+                {deliveryAddress.landmark && (
+                  <p className="leading-5">
+                    Near {deliveryAddress.landmark}
+                  </p>
+                )}
+
+                <p className="leading-5">
+                  {deliveryAddress.city} - {deliveryAddress.pincode}
+                </p>
+
+                <p className="mt-1 font-semibold text-[#1E3A27]">
+                  Phone: {order.customer_phone}
+                </p>
+              </div>
+            </section>
+
+            <section className="space-y-2 rounded-2xl border border-[#E7DEC8] bg-white p-4 text-xs text-stone-600">
               <div className="flex items-center gap-1.5 font-bold text-stone-800">
-                <Store className="w-4 h-4 text-[#1E3A27]" />
+                <Store
+                  size={16}
+                  className="text-[#1E3A27]"
+                />
                 <span>Dispatched From Store</span>
               </div>
-              <p className="font-bold text-stone-800">ManaDeshi Dukaan by Swathi</p>
-              <p>Sai Srinivasa Nilayam, Manikonda</p>
-              <p>Hyderabad - 500089</p>
-              <p className="text-emerald-700 font-bold">⚡ Hyderabad Express Delivery (2-4 Hrs)</p>
-            </div>
+
+              <div className="pt-1">
+                <p className="font-bold text-stone-800">
+                  ManaDeshi Dukaan by Swathi
+                </p>
+
+                <p className="mt-1 leading-5">
+                  Sai Srinivasa Nilayam, Manikonda
+                </p>
+
+                <p className="leading-5">
+                  Hyderabad - 500089
+                </p>
+
+                <p className="mt-1 font-bold text-emerald-700">
+                  ⚡ Hyderabad Express Delivery (2-4 Hrs)
+                </p>
+              </div>
+            </section>
           </div>
 
-          {/* Order Items Summary */}
-          <div className="p-4 bg-white rounded-2xl border border-[#E7DEC8] space-y-2.5">
-            <div className="text-xs font-bold uppercase tracking-wider text-stone-800">
+          {/* Items */}
+          <section className="rounded-2xl border border-[#E7DEC8] bg-white p-4 sm:p-5">
+            <div className="mb-2.5 text-xs font-bold uppercase tracking-wider text-stone-800">
               Ordered Items ({order.items.length})
             </div>
 
             <div className="divide-y divide-stone-100">
-              {order.items.map((item, i) => (
-                <div key={i} className="py-2.5 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2.5">
-                    {item.product_image && (
+              {order.items.map((item, index) => (
+                <div
+                  key={`${item.product_id}-${index}`}
+                  className="flex items-center justify-between gap-3 py-3"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    {item.product_image ? (
                       <img
                         src={item.product_image}
                         alt={item.product_name}
-                        className="w-10 h-10 object-cover rounded-lg border border-stone-200"
+                        className="h-11 w-11 shrink-0 rounded-lg border border-stone-200 object-cover"
                       />
+                    ) : (
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#F4EFE6] text-[#1E3A27]">
+                        <Store size={16} />
+                      </div>
                     )}
-                    <div>
-                      <div className="font-bold text-stone-800">{item.product_name}</div>
-                      <div className="text-stone-500 text-[11px]">Size: {item.variant_title} × {item.quantity}</div>
+
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-bold text-stone-800">
+                        {item.product_name}
+                      </div>
+
+                      <div className="mt-0.5 text-[10px] text-stone-500 sm:text-[11px]">
+                        Size: {item.variant_title} × {item.quantity}
+                      </div>
                     </div>
                   </div>
-                  <div className="font-bold text-[#1E3A27]">₹{item.price * item.quantity}</div>
+
+                  <div className="shrink-0 text-xs font-bold text-[#1E3A27]">
+                    ₹{item.price * item.quantity}
+                  </div>
                 </div>
               ))}
             </div>
 
-            <div className="pt-3 border-t border-stone-200 space-y-1 text-xs">
-              <div className="flex justify-between text-stone-600">
+            {/* Totals */}
+            <div className="mt-2 space-y-1.5 border-t border-stone-200 pt-3 text-xs">
+              <div className="flex justify-between gap-4 text-stone-600">
                 <span>Subtotal</span>
                 <span>₹{order.subtotal}</span>
               </div>
+
               {order.discount_amount > 0 && (
-                <div className="flex justify-between text-emerald-700 font-semibold">
+                <div className="flex justify-between gap-4 font-semibold text-emerald-700">
                   <span>Discount</span>
                   <span>-₹{order.discount_amount}</span>
                 </div>
               )}
-              <div className="flex justify-between text-stone-600">
+
+              <div className="flex justify-between gap-4 text-stone-600">
                 <span>Delivery Charge</span>
-                <span>{order.delivery_fee === 0 ? 'FREE' : `₹${order.delivery_fee}`}</span>
+                <span>
+                  {order.delivery_fee === 0
+                    ? 'FREE'
+                    : `₹${order.delivery_fee}`}
+                </span>
               </div>
-              <div className="flex justify-between font-extrabold text-[#1E3A27] text-sm pt-1 border-t border-stone-100">
+
+              <div className="flex justify-between gap-4 border-t border-stone-100 pt-2 text-sm font-extrabold text-[#1E3A27]">
                 <span>Total Paid / Payable</span>
                 <span>₹{order.total_amount}</span>
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* Actions & WhatsApp Support */}
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          {/* Actions */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
             <a
               href={defaultWaUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#20BA5A] text-white font-bold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all"
+              className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-xs font-bold text-white shadow-md transition hover:bg-[#20BA5A] sm:text-sm"
             >
-              <Phone className="w-4 h-4" />
+              <Phone size={16} />
               <span>Get Live Updates on WhatsApp</span>
             </a>
 
             <button
+              type="button"
               onClick={() => window.print()}
-              className="px-4 py-3 rounded-xl bg-white hover:bg-stone-50 border border-[#D8CEB9] text-stone-700 font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm"
+              className="flex min-h-12 items-center justify-center gap-1.5 rounded-xl border border-[#D8CEB9] bg-white px-5 py-3 text-xs font-semibold text-stone-700 shadow-sm transition hover:bg-stone-50 sm:text-sm"
             >
-              <Printer className="w-4 h-4" />
+              <Printer size={16} />
               <span>Print Invoice</span>
             </button>
           </div>
-
         </div>
-
       </div>
     </div>
   );

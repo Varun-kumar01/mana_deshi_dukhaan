@@ -1,21 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShoppingBag, 
-  Heart, 
   Search, 
   MapPin, 
   Phone, 
-  Sparkles, 
   Menu, 
   X, 
-  ShieldCheck, 
-  ExternalLink,
   ChevronDown,
   LayoutDashboard,
   Store
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
-import { useWishlist } from '../context/WishlistContext';
 import { Product, Category } from '../types';
 
 interface NavbarProps {
@@ -46,8 +41,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   pincodeArea
 }) => {
   const { itemCount, totalAmount, setIsCartOpen } = useCart();
-  const { wishlistCount } = useWishlist();
-
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -127,7 +120,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="font-serif-display font-extrabold text-xl sm:text-2xl text-[#1E3A27] tracking-tight group-hover:text-[#B35427] transition-colors">
+                  <span className="font-[family-name:'Playfair_Display',Georgia,serif] font-extrabold text-xl sm:text-2xl text-[#1E3A27] tracking-tight group-hover:text-[#B35427] transition-colors">
                     MANADESHI DUKAAN
                   </span>
                   <span className="hidden md:inline-block text-[10px] uppercase font-bold tracking-widest bg-[#D97706]/15 text-[#9A5B00] px-2 py-0.5 rounded-md border border-[#D97706]/30">
@@ -311,7 +304,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Category Pills Navigation Bar */}
       {!isAdminView && (
-        <div className="border-t border-[#E7DEC8]/80 bg-[#FAF7F2] overflow-x-auto scrollbar-none py-2 px-4 sm:px-6">
+        <div className="border-t border-[#E7DEC8]/80 bg-[#FAF7F2] overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-2 px-4 sm:px-6">
           <div className="max-w-7xl mx-auto flex items-center gap-2 whitespace-nowrap">
             <button
               onClick={() => onSelectCategory('all')}

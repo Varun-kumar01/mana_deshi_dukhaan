@@ -7,8 +7,6 @@ import {
   MapPin, 
   Phone, 
   ArrowRight,
-  Star,
-  Award,
   CheckCircle2,
   Clock
 } from 'lucide-react';
@@ -55,7 +53,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           
           {/* Left Text & Value Proposition */}
           <div className="lg:col-span-7 text-center sm:text-left">
-            <h1 className="font-serif-display text-3xl sm:text-5xl lg:text-6xl font-extrabold text-[#1E3A27] leading-[1.15] tracking-tight">
+            <h1 className="font-[family-name:'Playfair_Display',Georgia,serif] text-3xl sm:text-5xl lg:text-6xl font-extrabold text-[#1E3A27] leading-[1.15] tracking-tight">
               Switch to a Healthier Lifestyle with Pure <span className="text-[#B35427] underline decoration-[#D97706]/40 underline-offset-8">Organic Foods</span>
             </h1>
 
@@ -140,7 +138,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-5 text-white">
                     <span className="text-xs font-bold uppercase tracking-wider text-[#FBBF24]">Signature Delicacy</span>
-                    <h3 className="font-serif-display text-xl font-bold">Kothimera Karam & Andhra Avakaya</h3>
+                    <h3 className="font-[family-name:'Playfair_Display',Georgia,serif] text-xl font-bold">Kothimera Karam & Andhra Avakaya</h3>
                     <p className="text-xs text-stone-200 mt-1">Ground fresh with organic cold-pressed sesame oil</p>
                   </div>
                 </div>
@@ -164,7 +162,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </div>
 
               {/* Floating Feature Tag 1 */}
-              <div className="absolute -top-4 -left-4 bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-xl border border-stone-200 flex items-center gap-2.5 animate-bounce-slow">
+              <div className="absolute -top-4 -left-4 flex animate-bounce items-center gap-2.5 rounded-2xl border border-stone-200 bg-white/95 p-3 shadow-xl backdrop-blur-md">
                 <div className="w-9 h-9 rounded-xl bg-[#1E3A27] text-white flex items-center justify-center font-bold text-base">
                   🏺
                 </div>

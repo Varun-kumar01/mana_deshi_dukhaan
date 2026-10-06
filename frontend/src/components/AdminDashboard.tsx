@@ -1,29 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Package,
-  Plus,
-  Trash2,
-  RefreshCw,
-  Store,
   Check,
-  Upload,
+  Package,
   Pencil,
+  Plus,
+  RefreshCw,
   Save,
+  Store,
+  Trash2,
+  Upload,
+  X,
 } from 'lucide-react';
 import {
+  bulkUploadProducts,
+  createProduct,
+  deleteProduct,
   fetchAdminStats,
   fetchAllOrders,
-  updateOrderStatus,
-  fetchProducts,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-  bulkUploadProducts,
-  fetchInventory,
-  updateVariantStock,
   fetchCategories,
+  fetchInventory,
+  fetchProducts,
+  updateOrderStatus,
+  updateProduct,
+  updateVariantStock,
 } from '../services/api';
-import { Product, Order, AdminStats, Category } from '../types';
+import {
+  AdminStats,
+  Category,
+  Order,
+  Product,
+} from '../types';
 
 interface AdminDashboardProps {
   onBackToStore: () => void;
@@ -41,46 +47,89 @@ const emptyForm = {
   is_featured: false,
   is_bestseller: false,
   variants: [
-    { title: '250g', price: 150, stock_quantity: 50 },
-    { title: '500g', price: 290, stock_quantity: 40 },
+    {
+      title: '250g',
+      price: 150,
+      stock_quantity: 50,
+    },
+    {
+      title: '500g',
+      price: 290,
+      stock_quantity: 40,
+    },
   ],
 };
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({
-  onBackToStore,
-  onCatalogChange,
-}) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'products' | 'inventory'>('overview');
-  const [stats, setStats] = useState<AdminStats | null>(null);
+type AdminTab =
+  | 'overview'
+  | 'orders'
+  | 'products'
+  | 'inventory';
+
+export const AdminDashboard: React.FC<
+  AdminDashboardProps
+> = ({ onBackToStore, onCatalogChange }) => {
+  const [activeTab, setActiveTab] =
+    useState<AdminTab>('overview');
+
+  const [stats, setStats] =
+    useState<AdminStats | null>(null);
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [orderFilter, setOrderFilter] = useState('all');
-  const [statusUpdateSuccess, setStatusUpdateSuccess] = useState<string | null>(null);
 
-  const [productModalOpen, setProductModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState({ ...emptyForm });
+  const [statusUpdateSuccess, setStatusUpdateSuccess] =
+    useState<string | null>(null);
+
+  const [productModalOpen, setProductModalOpen] =
+    useState(false);
+
+  const [editingId, setEditingId] =
+    useState<number | null>(null);
+
+  const [form, setForm] = useState({
+    ...emptyForm,
+  });
+
   const [bulkText, setBulkText] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
+
     try {
-      const [statsData, ordersData, productsData, cats, inv] = await Promise.all([
+      const [
+        statsData,
+        ordersData,
+        productsData,
+        cats,
+        inv,
+      ] = await Promise.all([
         fetchAdminStats(),
         fetchAllOrders(orderFilter),
         fetchProducts(),
         fetchCategories(),
         fetchInventory(),
       ]);
-      if (statsData) setStats(statsData);
-      setOrders(ordersData);
-      setProducts(productsData);
-      setCategories(cats);
-      setInventory(inv);
+
+      if (statsData) {
+        setStats(statsData);
+      }
+
+      setOrders(ordersData || []);
+      setProducts(productsData || []);
+      setCategories(cats || []);
+      setInventory(inv || []);
+    } catch {
+      setOrders([]);
+      setProducts([]);
+      setCategories([]);
+      setInventory([]);
     } finally {
       setLoading(false);
     }
@@ -90,67 +139,124 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     loadData();
   }, [orderFilter]);
 
-  const notify = (msg: string) => {
-    setStatusUpdateSuccess(msg);
-    setTimeout(() => setStatusUpdateSuccess(null), 3000);
+  const notify = (message: string) => {
+    setStatusUpdateSuccess(message);
+
+    window.setTimeout(() => {
+      setStatusUpdateSuccess(null);
+    }, 3000);
   };
 
-  const handleStatusChange = async (orderId: number, newStatus: string) => {
-    const success = await updateOrderStatus(orderId, newStatus);
+  const handleStatusChange = async (
+    orderId: number,
+    newStatus: string
+  ) => {
+    const success = await updateOrderStatus(
+      orderId,
+      newStatus
+    );
+
     if (success) {
-      notify(`Order #${orderId} marked as ${newStatus}`);
-      loadData();
+      notify(
+        `Order #${orderId} marked as ${newStatus}`
+      );
+      await loadData();
     }
   };
 
   const openAdd = () => {
     setEditingId(null);
-    setForm({ ...emptyForm, category_id: categories[0]?.id || 1 });
-    setProductModalOpen(true);
-  };
 
-  const openEdit = (p: Product) => {
-    setEditingId(p.id);
     setForm({
-      name: p.name,
-      category_id: p.category_id,
-      base_price: p.base_price,
-      compare_at_price: p.compare_at_price || p.base_price,
-      tagline: p.tagline || '',
-      description: p.description || '',
-      ingredients: p.ingredients || '',
-      is_featured: !!p.is_featured,
-      is_bestseller: !!p.is_bestseller,
-      variants: (p.variants && p.variants.length
-        ? p.variants.map(v => ({ title: v.title, price: v.price, stock_quantity: v.stock_quantity }))
-        : emptyForm.variants) as typeof emptyForm.variants,
+      ...emptyForm,
+      category_id: categories[0]?.id || 1,
+      variants: emptyForm.variants.map((variant) => ({
+        ...variant,
+      })),
     });
+
     setProductModalOpen(true);
   };
 
-  const handleSaveProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.name || !form.base_price) return;
+  const openEdit = (product: Product) => {
+    setEditingId(product.id);
 
-    const payload = { ...form };
+    setForm({
+      name: product.name,
+      category_id: product.category_id,
+      base_price: product.base_price,
+      compare_at_price:
+        product.compare_at_price || product.base_price,
+      tagline: product.tagline || '',
+      description: product.description || '',
+      ingredients: product.ingredients || '',
+      is_featured: !!product.is_featured,
+      is_bestseller: !!product.is_bestseller,
+      variants:
+        product.variants && product.variants.length
+          ? product.variants.map((variant) => ({
+              title: variant.title,
+              price: variant.price,
+              stock_quantity:
+                variant.stock_quantity,
+            }))
+          : emptyForm.variants.map((variant) => ({
+              ...variant,
+            })),
+    });
+
+    setProductModalOpen(true);
+  };
+
+  const handleSaveProduct = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+
+    if (!form.name.trim() || !form.base_price) {
+      notify('Product name and base price are required');
+      return;
+    }
+
+    const payload = {
+      ...form,
+      name: form.name.trim(),
+    };
+
     const result = editingId
       ? await updateProduct(editingId, payload)
       : await createProduct(payload);
 
     if (result.success) {
       setProductModalOpen(false);
-      notify(editingId ? 'Product updated' : 'Product added');
+
+      notify(
+        editingId
+          ? 'Product updated'
+          : 'Product added'
+      );
+
       await loadData();
       onCatalogChange?.();
     } else {
-      notify(result.message || 'Could not save product');
+      notify(
+        result.message || 'Could not save product'
+      );
     }
   };
 
   const handleDeleteProduct = async (id: number) => {
-    if (!window.confirm('Delete this product from inventory?')) return;
-    const ok = await deleteProduct(id);
-    if (ok) {
+    if (
+      !window.confirm(
+        'Delete this product from inventory?'
+      )
+    ) {
+      return;
+    }
+
+    const success = await deleteProduct(id);
+
+    if (success) {
       notify('Product deleted');
       await loadData();
       onCatalogChange?.();
@@ -158,317 +264,1283 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleBulkUpload = async () => {
-    const lines = bulkText.trim().split('\n').filter(Boolean);
-    if (!lines.length) return;
+    const lines = bulkText
+      .trim()
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (!lines.length) {
+      notify('Please enter CSV product data');
+      return;
+    }
 
     const header = lines[0].toLowerCase();
-    const hasHeader = header.includes('name') && header.includes('price');
-    const rows = hasHeader ? lines.slice(1) : lines;
 
-    const parsed = rows.map(line => {
-      const [name, category_id, base_price, tagline, stock] = line.split(',').map(s => s.trim());
-      return {
-        name,
-        category_id: Number(category_id) || 1,
-        base_price: Number(base_price),
-        tagline: tagline || '',
-        variants: [{ title: 'Standard', price: Number(base_price), stock_quantity: Number(stock) || 50 }],
-      };
-    }).filter(p => p.name && p.base_price);
+    const hasHeader =
+      header.includes('name') &&
+      header.includes('price');
 
-    const result = await bulkUploadProducts(parsed);
+    const rows = hasHeader
+      ? lines.slice(1)
+      : lines;
+
+    const parsed = rows
+      .map((line) => {
+        const [
+          name,
+          category_id,
+          base_price,
+          tagline,
+          stock,
+        ] = line
+          .split(',')
+          .map((value) => value.trim());
+
+        return {
+          name,
+          category_id: Number(category_id) || 1,
+          base_price: Number(base_price),
+          tagline: tagline || '',
+          variants: [
+            {
+              title: 'Standard',
+              price: Number(base_price),
+              stock_quantity:
+                Number(stock) || 50,
+            },
+          ],
+        };
+      })
+      .filter(
+        (product) =>
+          product.name &&
+          product.base_price
+      );
+
+    if (!parsed.length) {
+      notify('No valid products found in CSV');
+      return;
+    }
+
+    const result =
+      await bulkUploadProducts(parsed);
+
     if (result.success) {
-      notify(result.message || `Uploaded ${result.count} products`);
+      notify(
+        result.message ||
+          `Uploaded ${result.count} products`
+      );
+
       setBulkOpen(false);
       setBulkText('');
+
       await loadData();
       onCatalogChange?.();
     } else {
-      notify(result.message || 'Bulk upload failed');
+      notify(
+        result.message || 'Bulk upload failed'
+      );
     }
   };
 
-  const handleStockSave = async (variantId: number, stock: number) => {
-    const ok = await updateVariantStock(variantId, stock);
-    if (ok) notify('Stock updated');
-    else notify('Could not update stock');
+  const handleStockSave = async (
+    variantId: number,
+    stock: number
+  ) => {
+    const success = await updateVariantStock(
+      variantId,
+      stock
+    );
+
+    if (success) {
+      notify('Stock updated');
+      await loadData();
+    } else {
+      notify('Could not update stock');
+    }
   };
 
+  const tabs: {
+    key: AdminTab;
+    label: string;
+  }[] = [
+    {
+      key: 'overview',
+      label: 'Overview',
+    },
+    {
+      key: 'orders',
+      label: 'Orders',
+    },
+    {
+      key: 'products',
+      label: 'Products',
+    },
+    {
+      key: 'inventory',
+      label: 'Stock',
+    },
+  ];
+
   return (
-    <div className="admin-wrap">
-      <header className="admin-topbar">
-        <div>
-          <div className="admin-title">Inventory</div>
-          <p style={{ fontSize: 12, opacity: 0.8, marginTop: 2 }}>ManaDeshi Dukaan · Admin</p>
+    <div className="flex min-h-dvh flex-col bg-[#FAF7F2] text-[#1A2318]">
+      {/* Header */}
+      <header className="sticky top-0 z-40 flex shrink-0 items-center justify-between gap-3 bg-[#1E3A27] px-4 py-3.5 text-white shadow-lg sm:px-6">
+        <div className="min-w-0">
+          <div className="font-display text-xl font-extrabold sm:text-[22px]">
+            Inventory
+          </div>
+
+          <p className="mt-0.5 truncate text-[10px] text-white/70 sm:text-xs">
+            ManaDeshi Dukaan · Admin
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={loadData} className="topbar-btn" style={{ color: '#fff', background: 'rgba(255,255,255,.12)', borderColor: 'transparent' }}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={loadData}
+            aria-label="Refresh dashboard"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+          >
+            <RefreshCw
+              size={16}
+              className={
+                loading ? 'animate-spin' : ''
+              }
+            />
           </button>
-          <button onClick={onBackToStore} className="btn-primary" style={{ background: '#fff', color: 'var(--green)' }}>
-            <Store size={15} /> Store
+
+          <button
+            type="button"
+            onClick={onBackToStore}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3.5 py-2.5 text-xs font-bold text-[#1E3A27] transition hover:bg-[#EEF5F0] sm:px-4 sm:text-sm"
+          >
+            <Store size={15} />
+            <span>Store</span>
           </button>
         </div>
       </header>
 
-      <div className="admin-tabs">
-        {[
-          { key: 'overview', label: 'Overview' },
-          { key: 'orders', label: 'Orders' },
-          { key: 'products', label: 'Products' },
-          { key: 'inventory', label: 'Stock' },
-        ].map(tab => (
-          <button
-            key={tab.key}
-            className={activeTab === tab.key ? 'active' : ''}
-            onClick={() => setActiveTab(tab.key as typeof activeTab)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs */}
+      <nav className="sticky top-[69px] z-30 overflow-x-auto border-b border-[#E7DEC8] bg-white px-3 py-2 shadow-sm sm:top-[72px] sm:px-4">
+        <div className="mx-auto flex min-w-max gap-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() =>
+                setActiveTab(tab.key)
+              }
+              className={`rounded-full px-4 py-2 text-xs font-bold transition sm:text-[13px] ${
+                activeTab === tab.key
+                  ? 'bg-[#1E3A27] text-white shadow-sm'
+                  : 'text-[#4B5563] hover:bg-[#F4EFE6] hover:text-[#1E3A27]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </nav>
 
-      <main className="admin-main">
+      {/* Main */}
+      <main className="mx-auto w-full max-w-6xl flex-1 px-3 pb-12 pt-5 sm:px-5 lg:px-6">
+        {/* Notification */}
         {statusUpdateSuccess && (
-          <div className="admin-toast">
-            <Check size={14} /> {statusUpdateSuccess}
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-xs font-semibold text-green-800 sm:text-[13px]">
+            <Check size={15} />
+            <span>{statusUpdateSuccess}</span>
           </div>
         )}
 
+        {/* Loading */}
+        {loading && (
+          <div className="mb-4 flex items-center justify-center gap-2 rounded-xl border border-[#E7DEC8] bg-white px-4 py-3 text-xs text-stone-500">
+            <RefreshCw
+              size={14}
+              className="animate-spin"
+            />
+            Loading dashboard data...
+          </div>
+        )}
+
+        {/* Overview */}
         {activeTab === 'overview' && (
-          <div className="admin-kpis">
-            <div className="admin-card">
-              <span>Revenue</span>
-              <strong>₹{(stats?.totalRevenue || 0).toLocaleString()}</strong>
+          <div className="space-y-5">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#B35427]">
+                Dashboard
+              </p>
+
+              <h2 className="mt-1 font-display text-2xl font-extrabold text-[#1E3A27] sm:text-3xl">
+                Store Overview
+              </h2>
             </div>
-            <div className="admin-card">
-              <span>Orders</span>
-              <strong>{stats?.totalOrders || orders.length}</strong>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                label="Revenue"
+                value={`₹${(
+                  stats?.totalRevenue || 0
+                ).toLocaleString()}`}
+              />
+
+              <StatCard
+                label="Orders"
+                value={String(
+                  stats?.totalOrders ||
+                    orders.length
+                )}
+              />
+
+              <StatCard
+                label="Customers"
+                value={String(
+                  stats?.totalCustomers || 0
+                )}
+              />
+
+              <StatCard
+                label="Products"
+                value={String(products.length)}
+              />
             </div>
-            <div className="admin-card">
-              <span>Customers</span>
-              <strong>{stats?.totalCustomers || 0}</strong>
-            </div>
-            <div className="admin-card">
-              <span>Products</span>
-              <strong>{products.length}</strong>
+
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="rounded-[22px] border border-[#E7DEC8] bg-white p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                      Orders
+                    </p>
+                    <h3 className="mt-1 font-display text-lg font-bold text-[#1E3A27]">
+                      Recent Orders
+                    </h3>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveTab('orders')
+                    }
+                    className="text-xs font-bold text-[#B35427] hover:underline"
+                  >
+                    View all
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  {orders
+                    .slice(0, 5)
+                    .map((order) => (
+                      <div
+                        key={order.id}
+                        className="flex items-center justify-between gap-3 rounded-xl bg-[#FAF7F2] p-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-bold text-stone-800">
+                            {order.order_number}
+                          </p>
+                          <p className="truncate text-[10px] text-stone-500">
+                            {order.customer_name}
+                          </p>
+                        </div>
+
+                        <div className="shrink-0 text-right">
+                          <p className="text-xs font-bold text-[#1E3A27]">
+                            ₹{order.total_amount}
+                          </p>
+                          <p className="text-[10px] text-stone-500">
+                            {order.order_status}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+
+                  {!orders.length && (
+                    <p className="py-6 text-center text-xs text-stone-400">
+                      No orders found.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-[22px] border border-[#E7DEC8] bg-white p-5">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                    Catalog
+                  </p>
+
+                  <h3 className="mt-1 font-display text-lg font-bold text-[#1E3A27]">
+                    Store Catalog
+                  </h3>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveTab('products')
+                    }
+                    className="rounded-2xl border border-[#E7DEC8] bg-[#FAF7F2] p-4 text-left transition hover:border-[#1E3A27]"
+                  >
+                    <Package
+                      size={20}
+                      className="text-[#B35427]"
+                    />
+                    <p className="mt-3 text-2xl font-extrabold text-[#1E3A27]">
+                      {products.length}
+                    </p>
+                    <p className="text-xs text-stone-500">
+                      Products
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveTab('inventory')
+                    }
+                    className="rounded-2xl border border-[#E7DEC8] bg-[#FAF7F2] p-4 text-left transition hover:border-[#1E3A27]"
+                  >
+                    <Store
+                      size={20}
+                      className="text-[#B35427]"
+                    />
+                    <p className="mt-3 text-2xl font-extrabold text-[#1E3A27]">
+                      {inventory.length}
+                    </p>
+                    <p className="text-xs text-stone-500">
+                      Stock Rows
+                    </p>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
+        {/* Orders */}
         {activeTab === 'orders' && (
-          <div className="admin-card" style={{ overflowX: 'auto' }}>
-            <div className="filter-bar" style={{ border: 0, paddingTop: 0 }}>
-              {['all', 'Pending', 'Confirmed', 'Packed', 'Shipped', 'Delivered'].map(st => (
-                <button
-                  key={st}
-                  className={`filter-pill${orderFilter === st ? ' active-green' : ''}`}
-                  onClick={() => setOrderFilter(st)}
-                >
-                  {st}
-                </button>
-              ))}
+          <section>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#B35427]">
+                  Management
+                </p>
+
+                <h2 className="mt-1 font-display text-2xl font-extrabold text-[#1E3A27]">
+                  Orders
+                </h2>
+              </div>
             </div>
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Order</th>
-                  <th>Customer</th>
-                  <th>Total</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map(o => (
-                  <tr key={o.id}>
-                    <td>{o.order_number}</td>
-                    <td>
-                      <div>{o.customer_name}</div>
-                      <div className="muted">{o.customer_phone}</div>
-                    </td>
-                    <td>₹{o.total_amount}</td>
-                    <td>
-                      <select value={o.order_status} onChange={e => handleStatusChange(o.id, e.target.value)}>
-                        {['Pending', 'Confirmed', 'Packed', 'Shipped', 'Delivered', 'Cancelled'].map(s => (
-                          <option key={s}>{s}</option>
-                        ))}
-                      </select>
-                    </td>
-                  </tr>
+
+            <div className="overflow-hidden rounded-[22px] border border-[#E7DEC8] bg-white">
+              {/* Filters */}
+              <div className="flex gap-2 overflow-x-auto border-b border-[#E7DEC8] p-4">
+                {[
+                  'all',
+                  'Pending',
+                  'Confirmed',
+                  'Packed',
+                  'Shipped',
+                  'Delivered',
+                ].map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() =>
+                      setOrderFilter(status)
+                    }
+                    className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-bold transition ${
+                      orderFilter === status
+                        ? 'border-[#1E3A27] bg-[#1E3A27] text-white'
+                        : 'border-[#D8CEB9] bg-white text-[#1A2318] hover:border-[#1E3A27]'
+                    }`}
+                  >
+                    {status}
+                  </button>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full border-collapse text-[13px]">
+                  <thead>
+                    <tr className="border-b border-[#E7DEC8]">
+                      <th className="px-4 py-3 text-left font-bold text-[#4B5563]">
+                        Order
+                      </th>
+                      <th className="px-4 py-3 text-left font-bold text-[#4B5563]">
+                        Customer
+                      </th>
+                      <th className="px-4 py-3 text-left font-bold text-[#4B5563]">
+                        Total
+                      </th>
+                      <th className="px-4 py-3 text-left font-bold text-[#4B5563]">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {orders.map((order) => (
+                      <tr
+                        key={order.id}
+                        className="border-b border-[#E7DEC8] last:border-0 hover:bg-[#FAF7F2]"
+                      >
+                        <td className="px-4 py-3">
+                          <span className="font-bold text-[#1E3A27]">
+                            {order.order_number}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="font-semibold">
+                            {order.customer_name}
+                          </div>
+                          <div className="text-xs text-[#9CA3AF]">
+                            {order.customer_phone}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3 font-semibold">
+                          ₹{order.total_amount}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <OrderStatusSelect
+                            value={order.order_status}
+                            onChange={(value) =>
+                              handleStatusChange(
+                                order.id,
+                                value
+                              )
+                            }
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="divide-y divide-[#E7DEC8] md:hidden">
+                {orders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="space-y-3 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold text-[#1E3A27]">
+                          {order.order_number}
+                        </p>
+
+                        <p className="mt-1 text-sm font-semibold text-stone-800">
+                          {order.customer_name}
+                        </p>
+
+                        <p className="text-[10px] text-stone-500">
+                          {order.customer_phone}
+                        </p>
+                      </div>
+
+                      <p className="shrink-0 text-sm font-extrabold text-[#1E3A27]">
+                        ₹{order.total_amount}
+                      </p>
+                    </div>
+
+                    <OrderStatusSelect
+                      value={order.order_status}
+                      onChange={(value) =>
+                        handleStatusChange(
+                          order.id,
+                          value
+                        )
+                      }
+                    />
+                  </div>
+                ))}
+
+                {!orders.length && (
+                  <p className="p-8 text-center text-xs text-stone-400">
+                    No orders found.
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
         )}
 
+        {/* Products */}
         {activeTab === 'products' && (
-          <div>
-            <div className="admin-toolbar">
-              <h3>Catalog</h3>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className="btn-secondary" onClick={() => setBulkOpen(true)}>
-                  <Upload size={14} /> Bulk upload
+          <section>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#B35427]">
+                  Catalog
+                </p>
+
+                <h2 className="mt-1 font-display text-2xl font-extrabold text-[#1E3A27]">
+                  Products
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                <button
+                  type="button"
+                  onClick={() => setBulkOpen(true)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#1E3A27] bg-white px-3 py-2.5 text-xs font-bold text-[#1E3A27] transition hover:bg-[#EEF5F0] sm:px-4 sm:text-sm"
+                >
+                  <Upload size={14} />
+                  Bulk Upload
                 </button>
-                <button className="btn-primary" onClick={openAdd}>
-                  <Plus size={14} /> Add product
+
+                <button
+                  type="button"
+                  onClick={openAdd}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1E3A27] px-3 py-2.5 text-xs font-bold text-white transition hover:bg-[#2B5336] sm:px-4 sm:text-sm"
+                >
+                  <Plus size={14} />
+                  Add Product
                 </button>
               </div>
             </div>
 
-            <div className="admin-card" style={{ overflowX: 'auto' }}>
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Product</th>
-                    <th>Price</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map(p => (
-                    <tr key={p.id}>
-                      <td>
-                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                          <img src={(p.images && p.images[0]) || '/visiting_card.png'} alt="" className="admin-thumb" />
-                          <div>
-                            <div className="strong">{p.name}</div>
-                            <div className="muted">{p.category_name}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>₹{p.base_price}</td>
-                      <td>
-                        <button className="icon-btn" onClick={() => openEdit(p)} aria-label="Edit">
-                          <Pencil size={15} />
-                        </button>
-                        <button className="icon-btn danger" onClick={() => handleDeleteProduct(p.id)} aria-label="Delete">
-                          <Trash2 size={15} />
-                        </button>
-                      </td>
+            <div className="overflow-hidden rounded-[22px] border border-[#E7DEC8] bg-white">
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full border-collapse text-[13px]">
+                  <thead>
+                    <tr className="border-b border-[#E7DEC8]">
+                      <th className="px-4 py-3 text-left font-bold text-[#4B5563]">
+                        Product
+                      </th>
+                      <th className="px-4 py-3 text-left font-bold text-[#4B5563]">
+                        Price
+                      </th>
+                      <th className="px-4 py-3 text-right font-bold text-[#4B5563]">
+                        Actions
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+
+                  <tbody>
+                    {products.map((product) => (
+                      <tr
+                        key={product.id}
+                        className="border-b border-[#E7DEC8] last:border-0 hover:bg-[#FAF7F2]"
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={
+                                product.images?.[0] ||
+                                '/visiting_card.png'
+                              }
+                              alt=""
+                              className="h-11 w-11 rounded-xl border border-stone-200 object-cover"
+                            />
+
+                            <div className="min-w-0">
+                              <div className="truncate font-bold text-stone-800">
+                                {product.name}
+                              </div>
+
+                              <div className="mt-0.5 text-xs text-[#9CA3AF]">
+                                {product.category_name}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3 font-semibold">
+                          ₹{product.base_price}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-1">
+                            <ProductActionButton
+                              label="Edit"
+                              onClick={() =>
+                                openEdit(product)
+                              }
+                            >
+                              <Pencil size={15} />
+                            </ProductActionButton>
+
+                            <ProductActionButton
+                              label="Delete"
+                              danger
+                              onClick={() =>
+                                handleDeleteProduct(
+                                  product.id
+                                )
+                              }
+                            >
+                              <Trash2 size={15} />
+                            </ProductActionButton>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="divide-y divide-[#E7DEC8] md:hidden">
+                {products.map((product) => (
+                  <div
+                    key={product.id}
+                    className="flex items-center gap-3 p-4"
+                  >
+                    <img
+                      src={
+                        product.images?.[0] ||
+                        '/visiting_card.png'
+                      }
+                      alt=""
+                      className="h-14 w-14 shrink-0 rounded-xl border border-stone-200 object-cover"
+                    />
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-stone-800">
+                        {product.name}
+                      </p>
+
+                      <p className="mt-0.5 truncate text-[10px] text-stone-400">
+                        {product.category_name ||
+                          'Uncategorized'}
+                      </p>
+
+                      <p className="mt-1 text-sm font-extrabold text-[#1E3A27]">
+                        ₹{product.base_price}
+                      </p>
+                    </div>
+
+                    <div className="flex shrink-0 gap-1">
+                      <ProductActionButton
+                        label="Edit"
+                        onClick={() =>
+                          openEdit(product)
+                        }
+                      >
+                        <Pencil size={14} />
+                      </ProductActionButton>
+
+                      <ProductActionButton
+                        label="Delete"
+                        danger
+                        onClick={() =>
+                          handleDeleteProduct(
+                            product.id
+                          )
+                        }
+                      >
+                        <Trash2 size={14} />
+                      </ProductActionButton>
+                    </div>
+                  </div>
+                ))}
+
+                {!products.length && (
+                  <p className="p-8 text-center text-xs text-stone-400">
+                    No products found.
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+          </section>
         )}
 
+        {/* Inventory */}
         {activeTab === 'inventory' && (
-          <div className="admin-card" style={{ overflowX: 'auto' }}>
-            <h3 style={{ marginBottom: 16 }}>Stock by variant</h3>
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>SKU / Product</th>
-                  <th>Variant</th>
-                  <th>Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-                {inventory.map((row, i) => (
-                  <InventoryRow key={`${row.variantId}-${i}`} row={row} onSave={handleStockSave} />
-                ))}
-              </tbody>
-            </table>
-            {inventory.length === 0 && (
-              <p className="muted" style={{ padding: 24, textAlign: 'center' }}>
-                <Package size={20} /> No stock rows yet.
+          <section>
+            <div className="mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#B35427]">
+                Inventory
               </p>
-            )}
-          </div>
+
+              <h2 className="mt-1 font-display text-2xl font-extrabold text-[#1E3A27]">
+                Stock by Variant
+              </h2>
+            </div>
+
+            <div className="overflow-hidden rounded-[22px] border border-[#E7DEC8] bg-white">
+              {/* Desktop */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full border-collapse text-[13px]">
+                  <thead>
+                    <tr className="border-b border-[#E7DEC8]">
+                      <th className="px-4 py-3 text-left font-bold text-[#4B5563]">
+                        SKU / Product
+                      </th>
+                      <th className="px-4 py-3 text-left font-bold text-[#4B5563]">
+                        Variant
+                      </th>
+                      <th className="px-4 py-3 text-left font-bold text-[#4B5563]">
+                        Qty
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {inventory.map((row, index) => (
+                      <InventoryRow
+                        key={`${row.variantId}-${index}`}
+                        row={row}
+                        onSave={handleStockSave}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile */}
+              <div className="divide-y divide-[#E7DEC8] md:hidden">
+                {inventory.map((row, index) => (
+                  <InventoryMobileRow
+                    key={`${row.variantId}-${index}`}
+                    row={row}
+                    onSave={handleStockSave}
+                  />
+                ))}
+
+                {!inventory.length && (
+                  <div className="flex flex-col items-center justify-center gap-2 p-10 text-center text-xs text-[#9CA3AF]">
+                    <Package size={24} />
+                    No stock rows yet.
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
         )}
       </main>
 
+      {/* Add/Edit Product Modal */}
       {productModalOpen && (
-        <div className="modal-overlay" onClick={() => setProductModalOpen(false)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">{editingId ? 'Edit product' : 'Add product'}</h3>
-              <button onClick={() => setProductModalOpen(false)}>✕</button>
+        <div
+          className="fixed inset-0 z-[500] flex items-center justify-center overflow-y-auto bg-black/50 p-3 backdrop-blur-sm sm:p-4"
+          onClick={() =>
+            setProductModalOpen(false)
+          }
+        >
+          <div
+            className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-[28px] border border-[#E7DEC8] bg-white p-5 shadow-2xl sm:p-6"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#B35427]">
+                  Catalog
+                </p>
+
+                <h3 className="mt-1 font-display text-xl font-extrabold text-[#1A2318]">
+                  {editingId
+                    ? 'Edit Product'
+                    : 'Add Product'}
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setProductModalOpen(false)
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-full text-stone-500 transition hover:bg-[#F4EFE6]"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <form onSubmit={handleSaveProduct} className="auth-form">
-              <label className="field-label">Name
-                <input className="field-input" style={{ paddingLeft: 14 }} required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-              </label>
-              <label className="field-label">Category
-                <select className="field-input" style={{ paddingLeft: 14 }} value={form.category_id} onChange={e => setForm({ ...form, category_id: Number(e.target.value) })}>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+
+            <form
+              onSubmit={handleSaveProduct}
+              className="space-y-4"
+            >
+              <AdminField label="Name">
+                <input
+                  required
+                  value={form.name}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      name: event.target.value,
+                    })
+                  }
+                  className="w-full rounded-xl border-[1.5px] border-[#D8CEB9] bg-[#FAF7F2] px-3.5 py-[0.7rem] text-sm text-[#1A2318] outline-none transition-all duration-150 focus:border-[#1E3A27] focus:ring-[3px] focus:ring-[#1E3A27]/10"
+                />
+              </AdminField>
+
+              <AdminField label="Category">
+                <select
+                  value={form.category_id}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      category_id: Number(
+                        event.target.value
+                      ),
+                    })
+                  }
+                  className="w-full rounded-xl border-[1.5px] border-[#D8CEB9] bg-[#FAF7F2] px-3.5 py-[0.7rem] text-sm text-[#1A2318] outline-none transition-all duration-150 focus:border-[#1E3A27] focus:ring-[3px] focus:ring-[#1E3A27]/10"
+                >
+                  {categories.map((category) => (
+                    <option
+                      key={category.id}
+                      value={category.id}
+                    >
+                      {category.name}
+                    </option>
+                  ))}
                 </select>
-              </label>
-              <label className="field-label">Base price
-                <input className="field-input" style={{ paddingLeft: 14 }} type="number" required value={form.base_price} onChange={e => setForm({ ...form, base_price: Number(e.target.value) })} />
-              </label>
-              <label className="field-label">Tagline
-                <input className="field-input" style={{ paddingLeft: 14 }} value={form.tagline} onChange={e => setForm({ ...form, tagline: e.target.value })} />
-              </label>
-              <label className="field-label">Description
-                <textarea className="field-input" style={{ paddingLeft: 14 }} rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-              </label>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn-secondary" onClick={() => setProductModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn-primary"><Save size={14} /> Save</button>
+              </AdminField>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <AdminField label="Base Price">
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={form.base_price}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        base_price: Number(
+                          event.target.value
+                        ),
+                      })
+                    }
+                    className="w-full rounded-xl border-[1.5px] border-[#D8CEB9] bg-[#FAF7F2] px-3.5 py-[0.7rem] text-sm text-[#1A2318] outline-none transition-all duration-150 focus:border-[#1E3A27] focus:ring-[3px] focus:ring-[#1E3A27]/10"
+                  />
+                </AdminField>
+
+                <AdminField label="Compare Price">
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.compare_at_price}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        compare_at_price:
+                          Number(
+                            event.target.value
+                          ),
+                      })
+                    }
+                    className="w-full rounded-xl border-[1.5px] border-[#D8CEB9] bg-[#FAF7F2] px-3.5 py-[0.7rem] text-sm text-[#1A2318] outline-none transition-all duration-150 focus:border-[#1E3A27] focus:ring-[3px] focus:ring-[#1E3A27]/10"
+                  />
+                </AdminField>
+              </div>
+
+              <AdminField label="Tagline">
+                <input
+                  value={form.tagline}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      tagline: event.target.value,
+                    })
+                  }
+                  className="w-full rounded-xl border-[1.5px] border-[#D8CEB9] bg-[#FAF7F2] px-3.5 py-[0.7rem] text-sm text-[#1A2318] outline-none transition-all duration-150 focus:border-[#1E3A27] focus:ring-[3px] focus:ring-[#1E3A27]/10"
+                />
+              </AdminField>
+
+              <AdminField label="Description">
+                <textarea
+                  rows={4}
+                  value={form.description}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      description:
+                        event.target.value,
+                    })
+                  }
+                  className="w-full resize-none rounded-xl border-[1.5px] border-[#D8CEB9] bg-[#FAF7F2] px-3.5 py-[0.7rem] text-sm text-[#1A2318] outline-none transition-all duration-150 focus:border-[#1E3A27] focus:ring-[3px] focus:ring-[#1E3A27]/10"
+                />
+              </AdminField>
+
+              <AdminField label="Ingredients">
+                <textarea
+                  rows={3}
+                  value={form.ingredients}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      ingredients:
+                        event.target.value,
+                    })
+                  }
+                  className="w-full resize-none rounded-xl border-[1.5px] border-[#D8CEB9] bg-[#FAF7F2] px-3.5 py-[0.7rem] text-sm text-[#1A2318] outline-none transition-all duration-150 focus:border-[#1E3A27] focus:ring-[3px] focus:ring-[#1E3A27]/10"
+                />
+              </AdminField>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-[#E7DEC8] bg-[#FAF7F2] p-3 text-xs font-bold text-stone-700">
+                  <input
+                    type="checkbox"
+                    checked={form.is_featured}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        is_featured:
+                          event.target.checked,
+                      })
+                    }
+                    className="h-4 w-4 accent-[#1E3A27]"
+                  />
+                  Featured Product
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-[#E7DEC8] bg-[#FAF7F2] p-3 text-xs font-bold text-stone-700">
+                  <input
+                    type="checkbox"
+                    checked={form.is_bestseller}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        is_bestseller:
+                          event.target.checked,
+                      })
+                    }
+                    className="h-4 w-4 accent-[#1E3A27]"
+                  />
+                  Bestseller
+                </label>
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setProductModalOpen(false)
+                  }
+                  className="inline-flex items-center justify-center rounded-xl border border-[#1E3A27] bg-white px-5 py-3 text-sm font-bold text-[#1E3A27] transition hover:bg-[#EEF5F0]"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1E3A27] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#2B5336]"
+                >
+                  <Save size={15} />
+                  Save Product
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
+      {/* Bulk Upload Modal */}
       {bulkOpen && (
-        <div className="modal-overlay" onClick={() => setBulkOpen(false)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Bulk upload</h3>
-              <button onClick={() => setBulkOpen(false)}>✕</button>
+        <div
+          className="fixed inset-0 z-[500] flex items-center justify-center overflow-y-auto bg-black/50 p-3 backdrop-blur-sm sm:p-4"
+          onClick={() => setBulkOpen(false)}
+        >
+          <div
+            className="w-full max-w-xl rounded-[28px] border border-[#E7DEC8] bg-white p-5 shadow-2xl sm:p-6"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#B35427]">
+                  Catalog Import
+                </p>
+
+                <h3 className="mt-1 font-display text-xl font-extrabold text-[#1A2318]">
+                  Bulk Upload
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setBulkOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-stone-500 transition hover:bg-[#F4EFE6]"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <p className="muted" style={{ marginBottom: 12, fontSize: 13 }}>
-              CSV: name, category_id, base_price, tagline, stock
-            </p>
+
+            <div className="mb-3 rounded-xl border border-[#E7DEC8] bg-[#FAF7F2] p-3">
+              <p className="text-[11px] font-bold text-stone-700">
+                CSV format
+              </p>
+
+              <code className="mt-1 block overflow-x-auto text-[10px] text-stone-500">
+                name, category_id, base_price, tagline, stock
+              </code>
+            </div>
+
             <textarea
-              className="field-input"
-              style={{ paddingLeft: 14, minHeight: 180 }}
-              placeholder={'name,category_id,base_price,tagline,stock\nGongura Pickle,1,180,Homemade,40'}
+              className="min-h-[200px] w-full rounded-xl border border-[#D8CEB9] bg-[#FAF7F2] px-3.5 py-3 text-sm text-[#1A2318] outline-none transition focus:border-[#1E3A27] focus:ring-2 focus:ring-[#1E3A27]/15"
+              placeholder={
+                'name,category_id,base_price,tagline,stock\nGongura Pickle,1,180,Homemade,40'
+              }
               value={bulkText}
-              onChange={e => setBulkText(e.target.value)}
+              onChange={(event) =>
+                setBulkText(event.target.value)
+              }
             />
-            <button className="btn-primary w-full mt-4" onClick={handleBulkUpload}>
-              Upload
-            </button>
+
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setBulkOpen(false)}
+                className="rounded-xl border border-[#1E3A27] bg-white px-5 py-3 text-sm font-bold text-[#1E3A27] transition hover:bg-[#EEF5F0]"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleBulkUpload}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1E3A27] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#2B5336]"
+              >
+                <Upload size={15} />
+                Upload Products
+              </button>
+            </div>
           </div>
         </div>
       )}
+
     </div>
   );
 };
+
+function StatCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[20px] border border-[#E7DEC8] bg-white p-4 shadow-sm sm:p-[18px]">
+      <span className="mb-1.5 block text-[11px] text-[#4B5563] sm:text-xs">
+        {label}
+      </span>
+
+      <strong className="block truncate text-xl font-extrabold text-[#1E3A27] sm:text-[22px]">
+        {value}
+      </strong>
+    </div>
+  );
+}
+
+function OrderStatusSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(event) =>
+        onChange(event.target.value)
+      }
+      className="w-full rounded-lg border border-[#D8CEB9] bg-white px-2.5 py-2 text-xs font-semibold text-[#1A2318] outline-none focus:border-[#1E3A27] focus:ring-2 focus:ring-[#1E3A27]/10 sm:w-auto"
+    >
+      {[
+        'Pending',
+        'Confirmed',
+        'Packed',
+        'Shipped',
+        'Delivered',
+        'Cancelled',
+      ].map((status) => (
+        <option key={status} value={status}>
+          {status}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function ProductActionButton({
+  children,
+  label,
+  onClick,
+  danger = false,
+}: {
+  children: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      className={`flex h-9 w-9 items-center justify-center rounded-lg transition ${
+        danger
+          ? 'text-stone-500 hover:bg-red-50 hover:text-red-600'
+          : 'text-stone-500 hover:bg-[#EEF5F0] hover:text-[#1E3A27]'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function AdminField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5 text-xs font-bold text-[#1A2318]">
+      {label}
+      {children}
+    </label>
+  );
+}
 
 function InventoryRow({
   row,
   onSave,
 }: {
   row: any;
-  onSave: (variantId: number, stock: number) => void;
+  onSave: (
+    variantId: number,
+    stock: number
+  ) => void;
 }) {
-  const [qty, setQty] = useState(row.stockQuantity ?? 0);
+  const [qty, setQty] = useState(
+    row.stockQuantity ?? 0
+  );
+
   return (
-    <tr>
-      <td>
-        <div className="strong">{row.productName}</div>
-        <div className="muted">{row.sku}</div>
+    <tr className="border-b border-[#E7DEC8] last:border-0 hover:bg-[#FAF7F2]">
+      <td className="px-4 py-3 align-middle">
+        <div className="font-bold">
+          {row.productName}
+        </div>
+
+        <div className="text-xs text-[#9CA3AF]">
+          {row.sku}
+        </div>
       </td>
-      <td>{row.variantTitle}</td>
-      <td>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+
+      <td className="px-4 py-3 align-middle">
+        {row.variantTitle}
+      </td>
+
+      <td className="px-4 py-3 align-middle">
+        <div className="flex items-center gap-2">
           <input
             type="number"
-            className="field-input"
-            style={{ paddingLeft: 10, width: 88 }}
+            min="0"
             value={qty}
-            onChange={e => setQty(Number(e.target.value))}
+            onChange={(event) =>
+              setQty(
+                Math.max(
+                  0,
+                  Number(event.target.value)
+                )
+              )
+            }
+            className="w-24 rounded-lg border border-[#D8CEB9] bg-[#FAF7F2] px-2.5 py-2 text-sm outline-none focus:border-[#1E3A27] focus:ring-2 focus:ring-[#1E3A27]/10"
           />
-          <button className="btn-primary" style={{ padding: '8px 12px' }} onClick={() => onSave(row.variantId, qty)}>
+
+          <button
+            type="button"
+            onClick={() =>
+              onSave(row.variantId, qty)
+            }
+            className="rounded-lg bg-[#1E3A27] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#2B5336]"
+          >
             Save
           </button>
         </div>
       </td>
     </tr>
+  );
+}
+
+function InventoryMobileRow({
+  row,
+  onSave,
+}: {
+  row: any;
+  onSave: (
+    variantId: number,
+    stock: number
+  ) => void;
+}) {
+  const [qty, setQty] = useState(
+    row.stockQuantity ?? 0
+  );
+
+  return (
+    <div className="space-y-3 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-stone-800">
+            {row.productName}
+          </p>
+
+          <p className="mt-0.5 text-[10px] text-stone-400">
+            {row.sku}
+          </p>
+
+          <p className="mt-2 text-xs font-semibold text-[#B35427]">
+            {row.variantTitle}
+          </p>
+        </div>
+
+        <Package
+          size={18}
+          className="shrink-0 text-[#1E3A27]"
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min="0"
+          value={qty}
+          onChange={(event) =>
+            setQty(
+              Math.max(
+                0,
+                Number(event.target.value)
+              )
+            )
+          }
+          className="min-w-0 flex-1 rounded-lg border border-[#D8CEB9] bg-[#FAF7F2] px-3 py-2.5 text-sm font-semibold outline-none focus:border-[#1E3A27] focus:ring-2 focus:ring-[#1E3A27]/10"
+        />
+
+        <button
+          type="button"
+          onClick={() =>
+            onSave(row.variantId, qty)
+          }
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#1E3A27] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#2B5336]"
+        >
+          <Save size={13} />
+          Save
+        </button>
+      </div>
+    </div>
   );
 }

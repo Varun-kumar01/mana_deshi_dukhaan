@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, MapPin, Truck, Clock, Check, AlertCircle } from 'lucide-react';
+import { X, MapPin, Check } from 'lucide-react';
 import { checkPincode } from '../services/api';
 
 interface PincodeModalProps {
@@ -38,14 +38,14 @@ export const PincodeModal: React.FC<PincodeModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-[fadeIn_.3s_ease_both]">
       <div className="relative bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-[#E7DEC8]">
         
         {/* Header */}
         <div className="flex items-center justify-between p-4 bg-[#1E3A27] text-white">
           <div className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-[#FBBF24]" />
-            <h3 className="font-serif-display font-bold text-base">Check Hyderabad Delivery Speed</h3>
+            <h3 className="font-[family-name:'Playfair_Display',Georgia,serif] font-bold text-base">Check Hyderabad Delivery Speed</h3>
           </div>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-white/10 text-white/80">
             <X className="w-5 h-5" />
