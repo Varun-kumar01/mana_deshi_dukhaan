@@ -1,0 +1,13 @@
+{
+  "name": "manadeshi-dukaan",
+  "version": "1.0.0",
+  "description": "ManaDeshi Dukaan by Swathi - Full Stack Organic Food eCommerce Platform",
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install"
+  },
+  "keywords": ["organic-food", "ecommerce", "react", "tailwind", "express", "postgres"],
+  "author": "ManaDeshi Dukaan by Swathi",
+  "license": "ISC"
+}
