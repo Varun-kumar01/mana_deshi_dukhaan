@@ -7,7 +7,17 @@
     "dev:backend": "cd backend && npm run dev",
     "install:all": "cd backend && npm install && cd ../frontend && npm install"
   },
-  "keywords": ["organic-food", "ecommerce", "react", "tailwind", "express", "postgres"],
+  "keywords": [
+    "organic-food",
+    "ecommerce",
+    "react",
+    "tailwind",
+    "express",
+    "postgres"
+  ],
   "author": "ManaDeshi Dukaan by Swathi",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "react-router-dom": "^7.18.4"
+  }
 }
