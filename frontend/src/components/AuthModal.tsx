@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+
 import {
   CheckCircle2,
   Eye,
@@ -11,14 +12,21 @@ import {
   User,
   X,
 } from 'lucide-react';
+
 import { useAuth } from '../context/AuthContext';
-import { loginUser, registerUser } from '../services/api';
+
+import {
+  loginUser,
+  registerUser,
+} from '../services/api';
 
 interface AuthModalProps {
   onAdminAccess?: () => void;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ onAdminAccess }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({
+  onAdminAccess,
+}) => {
   const {
     isAuthModalOpen,
     setIsAuthModalOpen,
@@ -29,8 +37,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onAdminAccess }) => {
     isLoggedIn,
   } = useAuth();
 
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [showPass, setShowPass] = useState(false);
+  const [mode, setMode] = useState<'login' | 'register'>(
+    'login',
+  );
+
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -42,470 +53,510 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onAdminAccess }) => {
     password: '',
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
-    setError('');
-  };
+  useEffect(() => {
+    if (!isAuthModalOpen) {
+      setError('');
+      setSuccess('');
+      setLoading(false);
+    }
+  }, [isAuthModalOpen]);
 
-  const handleClose = () => {
-    if (loading) return;
-
-    setIsAuthModalOpen(false);
+  const resetForm = () => {
+    setForm({
+      name: '',
+      email: '',
+      phone: '',
+      password: '',
+    });
     setError('');
     setSuccess('');
+    setShowPassword(false);
   };
 
   const switchMode = (nextMode: 'login' | 'register') => {
+    resetForm();
     setMode(nextMode);
-    setError('');
-    setSuccess('');
-    setShowPass(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const { name, value } = event.target;
 
-    if (loading) return;
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+
+    setError('');
+    setSuccess('');
+  };
+
+  const validateForm = () => {
+    if (mode === 'register') {
+      if (!form.name.trim()) {
+        return 'Please enter your full name.';
+      }
+
+      if (!form.phone.trim()) {
+        return 'Please enter your phone number.';
+      }
+
+      const phoneDigits = form.phone.replace(/\D/g, '');
+
+      if (
+        phoneDigits.length !== 10 &&
+        phoneDigits.length !== 12
+      ) {
+        return 'Please enter a valid phone number.';
+      }
+
+      if (
+        form.email.trim() &&
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+          form.email.trim(),
+        )
+      ) {
+        return 'Please enter a valid email address.';
+      }
+    }
+
+    if (!form.email.trim() && !form.phone.trim()) {
+      return 'Please enter your email or phone number.';
+    }
+
+    if (form.password.length < 6) {
+      return 'Password must be at least 6 characters.';
+    }
+
+    return '';
+  };
+
+  const handleSubmit = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+
+    const validationError = validateForm();
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
     setLoading(true);
     setError('');
     setSuccess('');
 
     try {
-      let res;
+      const response =
+        mode === 'login'
+          ? await loginUser({
+              emailOrPhone:
+                form.email.trim() ||
+                form.phone.trim(),
+              password: form.password,
+            })
+          : await registerUser({
+              name: form.name.trim(),
+              email: form.email.trim(),
+              phone: form.phone.trim(),
+              password: form.password,
+            });
 
-      if (mode === 'login') {
-        res = await loginUser({
-          emailOrPhone: form.email || form.phone,
-          password: form.password,
-        });
-      } else {
-        if (!form.name.trim()) {
-          setError('Name is required');
-          setLoading(false);
-          return;
-        }
+      if (
+        response.success &&
+        response.user &&
+        response.token
+      ) {
+        login(response.user, response.token);
 
-        if (!form.phone.trim()) {
-          setError('Phone is required');
-          setLoading(false);
-          return;
-        }
+        setSuccess(
+          response.message ||
+            (mode === 'login'
+              ? 'Welcome back!'
+              : 'Your account has been created!'),
+        );
 
-        if (form.password.length < 6) {
-          setError('Password must be at least 6 characters');
-          setLoading(false);
-          return;
-        }
+        /*
+         * Important:
+         * Admin does NOT get redirected automatically.
+         * Admin will use the future "Admin Dashboard"
+         * navigation item.
+         */
+        setTimeout(() => {
+          setIsAuthModalOpen(false);
+        }, 700);
 
-        res = await registerUser({
-          name: form.name,
-          email: form.email,
-          phone: form.phone,
-          password: form.password,
-        });
+        return;
       }
 
-      if (res.success && res.user && res.token) {
-        login(res.user, res.token);
-        setSuccess(res.message || 'Welcome!');
+      setError(
+        response.message ||
+          'Unable to complete authentication.',
+      );
+    } catch (requestError) {
+      console.error('Authentication error:', requestError);
 
-        if (res.user.role === 'admin') {
-          setTimeout(() => {
-            setIsAuthModalOpen(false);
-            onAdminAccess?.();
-          }, 800);
-        } else {
-          setTimeout(() => {
-            setIsAuthModalOpen(false);
-          }, 1000);
-        }
-      } else {
-        setError(res.message || 'Something went wrong');
-      }
-    } catch {
-      setError('Connection error. Please try again.');
+      setError(
+        'Unable to connect to the server. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  if (!isAuthModalOpen) return null;
+  const handleClose = () => {
+    if (loading) return;
+
+    setIsAuthModalOpen(false);
+  };
+
+  if (!isAuthModalOpen) {
+    return null;
+  }
 
   return (
     <div
-      className="fixed inset-0 z-[400] flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm min-[540px]:items-center min-[540px]:p-4"
+      className="fixed inset-0 z-[500] flex items-end justify-center bg-[#172019]/45 p-0 backdrop-blur-sm min-[540px]:items-center min-[540px]:p-4"
       onClick={handleClose}
     >
       <div
-        className="relative flex max-h-[92dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[28px] border border-[#E7DEC8] bg-white shadow-2xl min-[540px]:rounded-[28px]"
-        onClick={(e) => e.stopPropagation()}
+        className="relative max-h-[92dvh] w-full max-w-[440px] overflow-y-auto rounded-t-[30px] border border-[#e8dfcf] bg-[#fffdf9] px-5 pb-7 pt-6 shadow-[0_30px_100px_rgba(20,45,28,0.24)] sm:px-7 min-[540px]:rounded-[30px]"
+        onClick={(event) =>
+          event.stopPropagation()
+        }
       >
-        {/* Decorative top */}
-        <div className="h-1.5 shrink-0 bg-gradient-to-r from-[#1E3A27] via-[#B35427] to-[#1E3A27]" />
+        <button
+          type="button"
+          onClick={handleClose}
+          className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-[#f3eee5] text-[#526056] transition hover:bg-[#e8dfcf] hover:text-[#234b32]"
+          aria-label="Close"
+        >
+          <X size={18} />
+        </button>
 
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#F0EBDD] px-5 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EEF5F0] text-[#1E3A27]">
-              <User size={17} />
+        {isLoggedIn ? (
+          <div className="flex flex-col items-center py-5">
+            <div className="grid h-[76px] w-[76px] place-items-center rounded-full bg-[#234b32] font-[family-name:'Playfair_Display',Georgia,serif] text-3xl font-bold text-white shadow-lg">
+              {user?.name
+                ?.charAt(0)
+                .toUpperCase()}
             </div>
 
-            <div>
-              <p className="font-display text-sm font-extrabold text-[#1E3A27]">
-                ManaDeshi Dukaan
-              </p>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#B35427]">
-                Account
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleClose}
-            disabled={loading}
-            aria-label="Close"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F4EFE6] text-stone-500 transition hover:bg-[#E7DEC8] hover:text-[#1A2318] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="overflow-y-auto px-5 pb-7 pt-6 sm:px-7 sm:pb-8">
-          {isLoggedIn ? (
-            /* Logged-in profile */
-            <div className="flex flex-col items-center text-center">
-              <div className="flex h-[76px] w-[76px] items-center justify-center rounded-full bg-gradient-to-br from-[#1E3A27] to-[#2B5336] font-display text-3xl font-extrabold text-white shadow-sm">
-                {user?.name?.charAt(0).toUpperCase()}
-              </div>
-
-              <p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-[#B35427]">
-                Welcome back
-              </p>
-
-              <h2 className="mt-1 font-display text-2xl font-extrabold text-[#1A2318]">
+            <div className="mt-4 text-center">
+              <h2 className="font-[family-name:'Playfair_Display',Georgia,serif] text-2xl font-bold text-[#1d2a20]">
                 {user?.name}
               </h2>
 
-              <p className="mt-1 break-all text-sm text-stone-500">
+              <p className="mt-1 text-sm text-[#68736b]">
                 {user?.email || user?.phone}
               </p>
+            </div>
 
-              {isAdmin && (
-                <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-amber-800">
-                  <CheckCircle2 size={13} />
-                  Admin Account
-                </div>
-              )}
+            {isAdmin && (
+              <div className="mt-4 inline-flex items-center rounded-full border border-[#d9c89d] bg-[#f8f0d9] px-3.5 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#806323]">
+                Admin Account
+              </div>
+            )}
 
-              <div className="mt-7 w-full space-y-3">
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAuthModalOpen(false);
-                      onAdminAccess?.();
-                    }}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#1E3A27] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#2B5336]"
-                  >
-                    <Settings size={17} />
-                    Go to Admin Dashboard
-                  </button>
-                )}
-
+            <div className="mt-7 w-full space-y-3">
+              {isAdmin && onAdminAccess && (
                 <button
                   type="button"
                   onClick={() => {
-                    logout();
                     setIsAuthModalOpen(false);
+                    onAdminAccess();
                   }}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm font-bold text-red-700 transition hover:bg-red-100"
+                  className="flex w-full items-center justify-center gap-2 rounded-full bg-[#234b32] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#173522]"
                 >
-                  <LogOut size={17} />
-                  Sign Out
+                  <Settings size={17} />
+                  Admin Dashboard
                 </button>
-              </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  setIsAuthModalOpen(false);
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-5 py-3.5 text-sm font-bold text-red-600 transition hover:bg-red-100"
+              >
+                <LogOut size={17} />
+                Sign Out
+              </button>
             </div>
-          ) : (
-            /* Authentication form */
-            <>
-              {/* Form heading */}
-              <div className="mb-6 text-center">
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF5F0] text-2xl">
-                  🌿
+          </div>
+        ) : (
+          <>
+            <div className="pr-8 text-center">
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#edf4ee] text-2xl">
+                🌿
+              </div>
+
+              <h2 className="mt-4 font-[family-name:'Playfair_Display',Georgia,serif] text-2xl font-bold tracking-[-0.02em] text-[#1d2a20]">
+                {mode === 'login'
+                  ? 'Welcome back'
+                  : 'Join ManaDeshi Dukaan'}
+              </h2>
+
+              <p className="mt-1.5 text-sm text-[#68736b]">
+                {mode === 'login'
+                  ? 'Sign in to continue shopping'
+                  : 'Create your account and start ordering'}
+              </p>
+            </div>
+
+            {success ? (
+              <div className="flex flex-col items-center py-12 text-center">
+                <div className="grid h-16 w-16 place-items-center rounded-full bg-[#edf4ee]">
+                  <CheckCircle2
+                    size={34}
+                    className="text-[#234b32]"
+                  />
                 </div>
 
-                <h2 className="font-display text-2xl font-extrabold text-[#1A2318]">
+                <h3 className="mt-5 text-lg font-bold text-[#1d2a20]">
                   {mode === 'login'
-                    ? 'Welcome back'
-                    : 'Join ManaDeshi Dukaan'}
-                </h2>
+                    ? 'Signed in successfully'
+                    : 'Account created successfully'}
+                </h3>
 
-                <p className="mt-1.5 text-sm text-stone-500">
-                  {mode === 'login'
-                    ? 'Sign in to your account'
-                    : 'Create your account to start ordering'}
+                <p className="mt-2 max-w-[300px] text-sm leading-6 text-[#68736b]">
+                  {success}
                 </p>
               </div>
-
-              {success ? (
-                <div className="flex flex-col items-center rounded-2xl bg-[#EEF5F0] px-5 py-10 text-center">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white">
-                    <CheckCircle2
-                      size={32}
-                      className="text-green-600"
-                    />
-                  </div>
-
-                  <p className="mt-4 text-sm font-bold text-[#1A2318]">
-                    {success}
-                  </p>
-                </div>
-              ) : (
-                <form
-                  className="flex flex-col gap-4"
-                  onSubmit={handleSubmit}
-                >
-                  {/* Name */}
-                  {mode === 'register' && (
-                    <div className="flex flex-col gap-1.5">
-                      <label
-                        htmlFor="auth-name"
-                        className="text-xs font-bold text-[#1A2318]"
-                      >
-                        Full Name
-                      </label>
-
-                      <div className="relative">
-                        <User
-                          size={16}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
-                        />
-
-                        <input
-                          id="auth-name"
-                          name="name"
-                          type="text"
-                          placeholder="Eg: Ravi Teja"
-                          value={form.name}
-                          onChange={handleChange}
-                          className="w-full rounded-xl border border-[#D8CEB9] bg-[#FAF7F2] py-3 pl-9 pr-3.5 text-sm text-[#1A2318] outline-none transition placeholder:text-stone-400 focus:border-[#1E3A27] focus:bg-white focus:ring-2 focus:ring-[#1E3A27]/15"
-                          required
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Email */}
-                  <div className="flex flex-col gap-1.5">
-                    <label
-                      htmlFor="auth-email"
-                      className="text-xs font-bold text-[#1A2318]"
-                    >
-                      {mode === 'register'
-                        ? 'Email (Optional)'
-                        : 'Email or Phone'}
+            ) : (
+              <form
+                onSubmit={handleSubmit}
+                className="mt-7 space-y-4"
+              >
+                {mode === 'register' && (
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-[#354138]">
+                      Full Name
                     </label>
 
                     <div className="relative">
                       <User
-                        size={16}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+                        size={17}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#89948c]"
                       />
 
                       <input
-                        id="auth-email"
-                        name="email"
-                        type={mode === 'login' ? 'text' : 'email'}
-                        placeholder={
-                          mode === 'login'
-                            ? 'admin@manadeshi.com or +91...'
-                            : 'your@email.com'
-                        }
-                        value={form.email}
+                        name="name"
+                        type="text"
+                        autoComplete="name"
+                        value={form.name}
                         onChange={handleChange}
-                        className="w-full rounded-xl border border-[#D8CEB9] bg-[#FAF7F2] py-3 pl-9 pr-3.5 text-sm text-[#1A2318] outline-none transition placeholder:text-stone-400 focus:border-[#1E3A27] focus:bg-white focus:ring-2 focus:ring-[#1E3A27]/15"
+                        placeholder="Your full name"
+                        className="w-full rounded-xl border border-[#ddd5c6] bg-[#faf7f2] py-3 pl-10 pr-4 text-sm text-[#1d2a20] outline-none transition placeholder:text-[#9ba39d] focus:border-[#234b32] focus:bg-white focus:ring-2 focus:ring-[#234b32]/10"
+                        required
                       />
                     </div>
                   </div>
+                )}
 
-                  {/* Registration phone */}
-                  {mode === 'register' && (
-                    <div className="flex flex-col gap-1.5">
-                      <label
-                        htmlFor="auth-phone"
-                        className="text-xs font-bold text-[#1A2318]"
-                      >
-                        Phone Number *
-                      </label>
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold text-[#354138]">
+                    {mode === 'register'
+                      ? 'Email Address (Optional)'
+                      : 'Email or Phone Number'}
+                  </label>
 
-                      <div className="relative">
-                        <Phone
-                          size={16}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
-                        />
+                  <div className="relative">
+                    <User
+                      size={17}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#89948c]"
+                    />
 
-                        <input
-                          id="auth-phone"
-                          name="phone"
-                          type="tel"
-                          placeholder="+91 9849012345"
-                          value={form.phone}
-                          onChange={handleChange}
-                          className="w-full rounded-xl border border-[#D8CEB9] bg-[#FAF7F2] py-3 pl-9 pr-3.5 text-sm text-[#1A2318] outline-none transition placeholder:text-stone-400 focus:border-[#1E3A27] focus:bg-white focus:ring-2 focus:ring-[#1E3A27]/15"
-                          required
-                        />
-                      </div>
-                    </div>
-                  )}
+                    <input
+                      name="email"
+                      type={
+                        mode === 'register'
+                          ? 'email'
+                          : 'text'
+                      }
+                      autoComplete={
+                        mode === 'register'
+                          ? 'email'
+                          : 'username'
+                      }
+                      value={form.email}
+                      onChange={handleChange}
+                      placeholder={
+                        mode === 'register'
+                          ? 'you@example.com'
+                          : 'Email or +91 phone'
+                      }
+                      className="w-full rounded-xl border border-[#ddd5c6] bg-[#faf7f2] py-3 pl-10 pr-4 text-sm text-[#1d2a20] outline-none transition placeholder:text-[#9ba39d] focus:border-[#234b32] focus:bg-white focus:ring-2 focus:ring-[#234b32]/10"
+                    />
+                  </div>
+                </div>
 
-                  {/* Login phone */}
-                  {mode === 'login' && !form.email && (
-                    <div className="flex flex-col gap-1.5">
-                      <label
-                        htmlFor="auth-login-phone"
-                        className="text-xs font-bold text-[#1A2318]"
-                      >
-                        Or Phone Number
-                      </label>
-
-                      <div className="relative">
-                        <Phone
-                          size={16}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
-                        />
-
-                        <input
-                          id="auth-login-phone"
-                          name="phone"
-                          type="tel"
-                          placeholder="+91 9849012345"
-                          value={form.phone}
-                          onChange={handleChange}
-                          className="w-full rounded-xl border border-[#D8CEB9] bg-[#FAF7F2] py-3 pl-9 pr-3.5 text-sm text-[#1A2318] outline-none transition placeholder:text-stone-400 focus:border-[#1E3A27] focus:bg-white focus:ring-2 focus:ring-[#1E3A27]/15"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Password */}
-                  <div className="flex flex-col gap-1.5">
-                    <label
-                      htmlFor="auth-password"
-                      className="text-xs font-bold text-[#1A2318]"
-                    >
-                      Password
+                {mode === 'register' && (
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-[#354138]">
+                      Phone Number
                     </label>
 
                     <div className="relative">
-                      <Lock
-                        size={16}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+                      <Phone
+                        size={17}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#89948c]"
                       />
 
                       <input
-                        id="auth-password"
-                        name="password"
-                        type={showPass ? 'text' : 'password'}
-                        placeholder="••••••••"
-                        value={form.password}
+                        name="phone"
+                        type="tel"
+                        autoComplete="tel"
+                        value={form.phone}
                         onChange={handleChange}
-                        className="w-full rounded-xl border border-[#D8CEB9] bg-[#FAF7F2] py-3 pl-9 pr-11 text-sm text-[#1A2318] outline-none transition placeholder:text-stone-400 focus:border-[#1E3A27] focus:bg-white focus:ring-2 focus:ring-[#1E3A27]/15"
+                        placeholder="+91 98490 12345"
+                        className="w-full rounded-xl border border-[#ddd5c6] bg-[#faf7f2] py-3 pl-10 pr-4 text-sm text-[#1d2a20] outline-none transition placeholder:text-[#9ba39d] focus:border-[#234b32] focus:bg-white focus:ring-2 focus:ring-[#234b32]/10"
                         required
                       />
+                    </div>
+                  </div>
+                )}
 
+                {mode === 'login' && !form.email && (
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-[#354138]">
+                      Phone Number
+                    </label>
+
+                    <div className="relative">
+                      <Phone
+                        size={17}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#89948c]"
+                      />
+
+                      <input
+                        name="phone"
+                        type="tel"
+                        autoComplete="tel"
+                        value={form.phone}
+                        onChange={handleChange}
+                        placeholder="+91 98490 12345"
+                        className="w-full rounded-xl border border-[#ddd5c6] bg-[#faf7f2] py-3 pl-10 pr-4 text-sm text-[#1d2a20] outline-none transition placeholder:text-[#9ba39d] focus:border-[#234b32] focus:bg-white focus:ring-2 focus:ring-[#234b32]/10"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold text-[#354138]">
+                    Password
+                  </label>
+
+                  <div className="relative">
+                    <Lock
+                      size={17}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#89948c]"
+                    />
+
+                    <input
+                      name="password"
+                      type={
+                        showPassword
+                          ? 'text'
+                          : 'password'
+                      }
+                      autoComplete={
+                        mode === 'login'
+                          ? 'current-password'
+                          : 'new-password'
+                      }
+                      value={form.password}
+                      onChange={handleChange}
+                      placeholder="At least 6 characters"
+                      className="w-full rounded-xl border border-[#ddd5c6] bg-[#faf7f2] py-3 pl-10 pr-11 text-sm text-[#1d2a20] outline-none transition placeholder:text-[#9ba39d] focus:border-[#234b32] focus:bg-white focus:ring-2 focus:ring-[#234b32]/10"
+                      required
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowPassword(
+                          (current) => !current,
+                        )
+                      }
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#89948c] transition hover:text-[#234b32]"
+                      aria-label={
+                        showPassword
+                          ? 'Hide password'
+                          : 'Show password'
+                      }
+                    >
+                      {showPassword ? (
+                        <EyeOff size={17} />
+                      ) : (
+                        <Eye size={17} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold leading-5 text-red-600">
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex w-full items-center justify-center gap-2 rounded-full bg-[#234b32] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#173522] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading && (
+                    <Loader2
+                      size={17}
+                      className="animate-spin"
+                    />
+                  )}
+
+                  {loading
+                    ? 'Please wait...'
+                    : mode === 'login'
+                      ? 'Sign In'
+                      : 'Create Account'}
+                </button>
+
+                <div className="pt-1 text-center text-xs text-[#68736b]">
+                  {mode === 'login' ? (
+                    <>
+                      New to ManaDeshi?{' '}
                       <button
                         type="button"
-                        aria-label={
-                          showPass
-                            ? 'Hide password'
-                            : 'Show password'
+                        onClick={() =>
+                          switchMode('register')
                         }
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 transition hover:text-[#1A2318]"
-                        onClick={() => setShowPass(!showPass)}
+                        className="font-bold text-[#234b32] underline underline-offset-2"
                       >
-                        {showPass ? (
-                          <EyeOff size={16} />
-                        ) : (
-                          <Eye size={16} />
-                        )}
+                        Create an account
                       </button>
-                    </div>
-                  </div>
-
-                  {/* Error */}
-                  {error && (
-                    <div
-                      role="alert"
-                      className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-xs font-medium leading-5 text-red-700"
-                    >
-                      {error}
-                    </div>
+                    </>
+                  ) : (
+                    <>
+                      Already have an account?{' '}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          switchMode('login')
+                        }
+                        className="font-bold text-[#234b32] underline underline-offset-2"
+                      >
+                        Sign in
+                      </button>
+                    </>
                   )}
-
-                  {/* Submit */}
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#1E3A27] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#2B5336] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {loading && (
-                      <Loader2
-                        size={17}
-                        className="animate-spin"
-                      />
-                    )}
-
-                    {loading
-                      ? 'Please wait...'
-                      : mode === 'login'
-                        ? 'Sign In'
-                        : 'Create Account'}
-                  </button>
-
-                  {/* Switch mode */}
-                  <div className="pt-1 text-center text-sm text-stone-500">
-                    {mode === 'login' ? (
-                      <>
-                        New to ManaDeshi?{' '}
-                        <button
-                          type="button"
-                          onClick={() => switchMode('register')}
-                          className="font-bold text-[#1E3A27] underline decoration-[#B35427]/50 underline-offset-2 hover:text-[#B35427]"
-                        >
-                          Create account
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        Already have an account?{' '}
-                        <button
-                          type="button"
-                          onClick={() => switchMode('login')}
-                          className="font-bold text-[#1E3A27] underline decoration-[#B35427]/50 underline-offset-2 hover:text-[#B35427]"
-                        >
-                          Sign in
-                        </button>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Demo credentials */}
-                  {mode === 'login' && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-center text-xs leading-5 text-amber-800">
-                      <strong>Demo:</strong>{' '}
-                      admin@manadeshi.com / admin123 for Admin access
-                    </div>
-                  )}
-                </form>
-              )}
-            </>
-          )}
-        </div>
+                </div>
+              </form>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

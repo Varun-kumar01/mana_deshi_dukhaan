@@ -1,35 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowRight,
   ChevronDown,
   ChevronRight,
   Filter,
+  Leaf,
   Search,
   SlidersHorizontal,
+  Sparkles,
   X,
-  ShoppingBag,
-  Leaf,
 } from 'lucide-react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { TopBar } from '../components/TopBar';
 import { ProductCard } from '../components/ProductCard';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { Footer } from '../components/Footer';
 
-import {
-  fetchProducts,
-  fetchCategories,
-} from '../services/api';
-
+import { fetchCategories, fetchProducts } from '../services/api';
 import {
   fallbackCategories,
   fallbackProducts,
 } from '../data/mockData';
 
-import {
-  Product,
-  Category,
-} from '../types';
+import { Category, Product } from '../types';
 
 const SHOP_CATEGORY_IMAGES = [
   'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=900&q=85',
@@ -38,7 +32,16 @@ const SHOP_CATEGORY_IMAGES = [
   'https://images.unsplash.com/photo-1589927986089-35812388d1f4?auto=format&fit=crop&w=900&q=85',
   'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=900&q=85',
   'https://images.unsplash.com/photo-1599785209707-a456fc1337bb?auto=format&fit=crop&w=900&q=85',
+  'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=900&q=85',
+  'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=900&q=85',
 ];
+
+const SORT_OPTIONS = [
+  ['featured', 'Featured'],
+  ['price_asc', 'Price: Low to High'],
+  ['price_desc', 'Price: High to Low'],
+  ['rating', 'Top Rated'],
+] as const;
 
 export function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -49,6 +52,9 @@ export function ShopPage() {
   const initialSearch =
     searchParams.get('search') || '';
 
+  const initialCollection =
+    searchParams.get('collection') || '';
+
   const [products, setProducts] =
     useState<Product[]>(fallbackProducts);
 
@@ -58,28 +64,35 @@ export function ShopPage() {
   const [selectedCategory, setSelectedCategory] =
     useState(initialCategory);
 
-  const [sortBy, setSortBy] =
-    useState('featured');
-
   const [search, setSearch] =
     useState(initialSearch);
 
+  const [collection, setCollection] =
+    useState(initialCollection);
+
+  const [sortBy, setSortBy] =
+    useState('featured');
+
   const [mobileFiltersOpen, setMobileFiltersOpen] =
+    useState(false);
+
+  const [sortOpen, setSortOpen] =
     useState(false);
 
   const [selectedProduct, setSelectedProduct] =
     useState<Product | null>(null);
 
-  const [showSort, setShowSort] =
-    useState(false);
-
   useEffect(() => {
+    let mounted = true;
+
     async function loadShop() {
       try {
         const [cats, prods] = await Promise.all([
           fetchCategories(),
           fetchProducts(),
         ]);
+
+        if (!mounted) return;
 
         if (cats?.length) {
           setCategories(cats);
@@ -89,43 +102,108 @@ export function ShopPage() {
           setProducts(prods);
         }
       } catch {
-        // Keep fallback data.
+        // Keep fallback data when API is unavailable.
       }
     }
 
     loadShop();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
-    const category =
-      searchParams.get('category') || 'all';
+    setSelectedCategory(
+      searchParams.get('category') || 'all'
+    );
 
-    const searchValue =
-      searchParams.get('search') || '';
+    setSearch(
+      searchParams.get('search') || ''
+    );
 
-    setSelectedCategory(category);
-    setSearch(searchValue);
+    setCollection(
+      searchParams.get('collection') || ''
+    );
   }, [searchParams]);
+
+  const currentCategory = useMemo(
+    () =>
+      categories.find(
+        (category) =>
+          category.slug === selectedCategory
+      ),
+    [categories, selectedCategory]
+  );
 
   const filteredProducts = useMemo(() => {
     let result = [...products];
 
     if (selectedCategory !== 'all') {
       const category = categories.find(
-        (item) => item.slug === selectedCategory,
+        (item) =>
+          item.slug === selectedCategory
       );
 
       if (category) {
         result = result.filter(
           (product) =>
             product.category_id === category.id ||
-            product.category_slug === selectedCategory,
+            product.category_slug ===
+              selectedCategory
+        );
+      }
+    }
+
+    if (collection) {
+      const normalizedCollection =
+        collection.toLowerCase();
+
+      if (
+        normalizedCollection === 'bestsellers' ||
+        normalizedCollection === 'best-sellers'
+      ) {
+        result = result.filter(
+          (product) =>
+            product.is_bestseller ||
+            product.is_featured
+        );
+      }
+
+      if (
+        normalizedCollection === 'featured'
+      ) {
+        result = result.filter(
+          (product) => product.is_featured
+        );
+      }
+
+      // if (
+      //   normalizedCollection === 'new-arrivals' ||
+      //   normalizedCollection === 'new'
+      // ) {
+      //   result = result.filter(
+      //     (product) =>
+      //       product.is_new ||
+      //       product.is_featured
+      //   );
+      // }
+      if (
+        normalizedCollection === 'new-arrivals' ||
+        normalizedCollection === 'new'
+      ) {
+        // Product type has no is_new field.
+        // Use featured products as the current "new arrivals"
+        // fallback until the backend exposes a dedicated field.
+        result = result.filter(
+          (product) => product.is_featured
         );
       }
     }
 
     if (search.trim()) {
-      const query = search.toLowerCase().trim();
+      const query =
+        search.toLowerCase().trim();
 
       result = result.filter((product) => {
         const name =
@@ -135,7 +213,8 @@ export function ShopPage() {
           product.tagline?.toLowerCase() || '';
 
         const category =
-          product.category_name?.toLowerCase() || '';
+          product.category_name?.toLowerCase() ||
+          '';
 
         return (
           name.includes(query) ||
@@ -155,7 +234,17 @@ export function ShopPage() {
       }
 
       if (sortBy === 'rating') {
-        return (b.rating || 5) - (a.rating || 5);
+        return (
+          (b.rating || 5) -
+          (a.rating || 5)
+        );
+      }
+
+      if (sortBy === 'featured') {
+        return (
+          Number(Boolean(b.is_featured)) -
+          Number(Boolean(a.is_featured))
+        );
       }
 
       return 0;
@@ -166,129 +255,190 @@ export function ShopPage() {
     products,
     categories,
     selectedCategory,
-    sortBy,
     search,
+    collection,
+    sortBy,
   ]);
-
-  const currentCategory =
-    categories.find(
-      (category) =>
-        category.slug === selectedCategory,
-    );
-
-  const updateCategory = (
-    category: string,
-  ) => {
-    setSelectedCategory(category);
-
-    const params = new URLSearchParams();
-
-    if (category !== 'all') {
-      params.set('category', category);
-    }
-
-    if (search.trim()) {
-      params.set('search', search.trim());
-    }
-
-    setSearchParams(params);
-    setMobileFiltersOpen(false);
-  };
-
-  const handleSearch = (
-    value: string,
-  ) => {
-    setSearch(value);
-
-    const params = new URLSearchParams();
-
-    if (selectedCategory !== 'all') {
-      params.set(
-        'category',
-        selectedCategory,
-      );
-    }
-
-    if (value.trim()) {
-      params.set('search', value.trim());
-    }
-
-    setSearchParams(params);
-  };
-
-  const clearFilters = () => {
-    setSelectedCategory('all');
-    setSearch('');
-    setSortBy('featured');
-    setSearchParams({});
-  };
 
   const categoryName =
     currentCategory?.name
       ?.split('(')[0]
       .trim();
 
+  const updateParams = (
+    nextCategory: string,
+    nextSearch: string,
+    nextCollection: string
+  ) => {
+    const params = new URLSearchParams();
+
+    if (nextCategory !== 'all') {
+      params.set('category', nextCategory);
+    }
+
+    if (nextSearch.trim()) {
+      params.set(
+        'search',
+        nextSearch.trim()
+      );
+    }
+
+    if (nextCollection) {
+      params.set(
+        'collection',
+        nextCollection
+      );
+    }
+
+    setSearchParams(params);
+  };
+
+  const updateCategory = (
+    category: string
+  ) => {
+    setSelectedCategory(category);
+
+    updateParams(
+      category,
+      search,
+      collection
+    );
+
+    setMobileFiltersOpen(false);
+  };
+
+  const handleSearch = (
+    value: string
+  ) => {
+    setSearch(value);
+
+    updateParams(
+      selectedCategory,
+      value,
+      collection
+    );
+  };
+
+  const handleCollection = (
+    value: string
+  ) => {
+    setCollection(value);
+
+    updateParams(
+      selectedCategory,
+      search,
+      value
+    );
+  };
+
+  const clearFilters = () => {
+    setSelectedCategory('all');
+    setSearch('');
+    setCollection('');
+    setSortBy('featured');
+    setSearchParams({});
+    setMobileFiltersOpen(false);
+  };
+
+  const selectedSortLabel =
+    SORT_OPTIONS.find(
+      ([value]) => value === sortBy
+    )?.[1] || 'Featured';
+
   return (
-    <div className="flex min-h-[100dvh] flex-col">
+    <div className="min-h-[100dvh] bg-[#faf8f2] text-[#26351f]">
       <TopBar
         products={products}
         onSelectProduct={setSelectedProduct}
         isAdminView={false}
       />
 
-      <main className="min-h-screen flex-1 bg-[#faf7f2]">
-        {/* SHOP HERO */}
-        <section className="relative overflow-hidden bg-[radial-gradient(circle_at_85%_20%,rgba(116,139,83,.14),transparent_30%),#f3efe4] py-[42px] pb-[72px] max-[768px]:py-[25px] max-[768px]:pb-[45px] max-[480px]:pt-5">
-          <div className="mx-auto w-[min(calc(100%-48px),1240px)] max-[960px]:w-[calc(100%-36px)] max-[680px]:w-[calc(100%-28px)]">
-            <div className="mb-[46px] flex flex-wrap items-center gap-[7px] text-[13px] text-[#7d7b70] max-[768px]:mb-8 max-[768px]:text-xs">
+      <main>
+        {/* HERO */}
+        <section className="relative overflow-hidden bg-[#f1eee3]">
+          <div className="absolute -right-24 -top-28 h-[360px] w-[360px] rounded-full bg-[#7c9a63]/10 blur-3xl" />
+          <div className="absolute -bottom-32 left-[-120px] h-[300px] w-[300px] rounded-full bg-[#d58b52]/10 blur-3xl" />
+
+          <div className="relative mx-auto w-[min(calc(100%-48px),1240px)] py-12 sm:py-16 lg:py-20 max-[680px]:w-[calc(100%-28px)]">
+            <div className="mb-8 flex items-center gap-2 text-xs text-[#77786f]">
               <Link
                 to="/"
-                className="text-inherit no-underline hover:text-[#496535]"
+                className="transition-colors hover:text-[#496735]"
               >
                 Home
               </Link>
 
               <ChevronRight size={14} />
 
-              <span>Shop</span>
+              <span className="text-[#34462d]">
+                Shop
+              </span>
 
               {categoryName && (
                 <>
                   <ChevronRight size={14} />
-
-                  <span>{categoryName}</span>
+                  <span>
+                    {categoryName}
+                  </span>
                 </>
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-[60px] max-[768px]:gap-[25px]">
+            <div className="grid items-end gap-10 lg:grid-cols-[1fr_300px]">
               <div>
-                <span className="text-[9px] font-extrabold uppercase tracking-[.16em] text-[var(--md-orange)]">
+                <span className="mb-3 block text-[10px] font-bold uppercase tracking-[0.2em] text-[#c16f38]">
                   ManaDeshi Dukaan
                 </span>
 
-                <h1 className="my-[10px] mb-[18px] max-w-[760px] font-['Playfair_Display',serif] text-[clamp(42px,5vw,76px)] leading-[.98] tracking-[-2.5px] text-[#253820] max-[768px]:mt-[9px] max-[768px]:text-[clamp(39px,11vw,55px)] max-[768px]:tracking-[-1.8px] max-[480px]:text-[40px]">
-                  {categoryName || 'Shop our collection'}
+                <h1 className="max-w-[800px] font-['Playfair_Display',Georgia,serif] text-5xl leading-[0.98] tracking-[-0.045em] text-[#263c21] sm:text-6xl lg:text-[76px]">
+                  {categoryName ||
+                    (collection
+                      ? collection
+                          .replace(
+                            /-/g,
+                            ' '
+                          )
+                          .replace(
+                            /\b\w/g,
+                            (letter) =>
+                              letter.toUpperCase()
+                          )
+                      : 'Shop our collection')}
                 </h1>
 
-                <p className="m-0 max-w-[570px] text-[17px] leading-[1.8] text-[#68685e] max-[768px]:text-sm max-[768px]:leading-[1.7] max-[480px]:text-[13px]">
-                  Traditional favourites, homemade goodness and everyday
-                  essentials, prepared with care.
+                <p className="mt-6 max-w-[610px] text-sm leading-7 text-[#6b6b62] sm:text-base">
+                  Traditional favourites,
+                  homemade goodness and
+                  everyday essentials —
+                  thoughtfully prepared for
+                  everyday homes.
                 </p>
+
+                {collection && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleCollection('')
+                    }
+                    className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#496735]/20 bg-white px-4 py-2 text-xs font-semibold text-[#496735] transition hover:bg-[#496735] hover:text-white"
+                  >
+                    Collection: {collection.replace(/-/g, ' ')}
+                    <X size={13} />
+                  </button>
+                )}
               </div>
 
-              <div className="shrink-0 max-[768px]:hidden">
-                <div className="flex h-[190px] w-[190px] -rotate-[8deg] flex-col items-center justify-center rounded-full border border-[rgba(73,101,53,.2)] text-[#496535]">
-                  <span className="text-[13px]">
+              <div className="hidden justify-self-end lg:block">
+                <div className="flex h-[210px] w-[210px] rotate-[-7deg] flex-col items-center justify-center rounded-full border border-[#496735]/20 text-center text-[#496735]">
+                  <Leaf size={24} strokeWidth={1.5} />
+                  <span className="mt-3 text-xs uppercase tracking-[0.16em]">
                     Made with
                   </span>
-
-                  <strong className="my-[7px] text-[30px] font-normal">
-                    ♥
+                  <strong className="mt-1 font-['Playfair_Display',Georgia,serif] text-3xl font-normal">
+                    care
                   </strong>
-
-                  <span className="text-[13px]">
-                    at home
+                  <span className="mt-1 text-xs">
+                    from our home to yours
                   </span>
                 </div>
               </div>
@@ -296,86 +446,155 @@ export function ShopPage() {
           </div>
         </section>
 
-        {/* CATEGORY STRIP */}
-        <section className="sticky top-0 z-[30] border-b border-[rgba(40,55,31,.1)] bg-[rgba(250,248,241,.94)] backdrop-blur-[18px] max-[768px]:relative">
-          <div className="mx-auto w-[min(calc(100%-48px),1240px)] max-[960px]:w-[calc(100%-36px)] max-[680px]:w-[calc(100%-28px)]">
-            <div className="flex items-center gap-2.5 overflow-x-auto py-[15px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-[768px]:-mx-4 max-[768px]:px-4 max-[768px]:py-[11px]">
+        {/* COLLECTION STRIP */}
+        <section className="border-b border-[#293c24]/10 bg-[#faf8f2]">
+          <div className="mx-auto w-[min(calc(100%-48px),1240px)] max-[680px]:w-[calc(100%-28px)]">
+            <div className="flex gap-3 overflow-x-auto py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <button
-                className={`inline-flex min-h-[42px] shrink-0 items-center gap-[9px] rounded-full border border-[rgba(54,70,44,.14)] bg-transparent py-[5px] pl-[7px] pr-4 text-[13px] text-[#5f6258] transition-all duration-[250ms] hover:border-[#4c6a38] hover:bg-[#4c6a38] hover:text-white max-[768px]:min-h-[39px] max-[768px]:pr-[13px] max-[768px]:text-xs ${
-                  selectedCategory === 'all'
-                    ? 'border-[#4c6a38] bg-[#4c6a38] text-white'
-                    : ''
+                type="button"
+                onClick={() =>
+                  handleCollection('')
+                }
+                className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                  !collection
+                    ? 'border-[#496735] bg-[#496735] text-white'
+                    : 'border-[#293c24]/15 bg-white text-[#5f655b] hover:border-[#496735] hover:text-[#496735]'
                 }`}
-                onClick={() => updateCategory('all')}
               >
                 All products
               </button>
 
-              {categories.map((category, index) => (
+              {[
+                ['bestsellers', 'Bestsellers'],
+                ['new-arrivals', 'New arrivals'],
+                ['featured', 'Featured'],
+              ].map(([value, label]) => (
                 <button
-                  key={category.id}
-                  className={`inline-flex min-h-[42px] shrink-0 items-center gap-[9px] rounded-full border border-[rgba(54,70,44,.14)] bg-transparent py-[5px] pl-[7px] pr-4 text-[13px] text-[#5f6258] transition-all duration-[250ms] hover:border-[#4c6a38] hover:bg-[#4c6a38] hover:text-white max-[768px]:min-h-[39px] max-[768px]:pr-[13px] max-[768px]:text-xs ${
-                    selectedCategory === category.slug
-                      ? 'border-[#4c6a38] bg-[#4c6a38] text-white'
-                      : ''
-                  }`}
+                  key={value}
+                  type="button"
                   onClick={() =>
-                    updateCategory(category.slug)
+                    handleCollection(value)
                   }
+                  className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                    collection === value
+                      ? 'border-[#496735] bg-[#496735] text-white'
+                      : 'border-[#293c24]/15 bg-white text-[#5f655b] hover:border-[#496735] hover:text-[#496735]'
+                  }`}
                 >
-                  <span className="flex h-[31px] w-[31px] overflow-hidden rounded-full max-[768px]:h-[27px] max-[768px]:w-[27px]">
-                    <img
-                      className="h-full w-full object-cover"
-                      src={
-                        SHOP_CATEGORY_IMAGES[
-                          index % SHOP_CATEGORY_IMAGES.length
-                        ]
-                      }
-                      alt=""
-                    />
-                  </span>
-
-                  {category.name
-                    .split('(')[0]
-                    .trim()}
+                  <Sparkles size={13} />
+                  {label}
                 </button>
               ))}
             </div>
           </div>
         </section>
 
-        {/* SHOP CONTENT */}
-        <section className="py-[58px] pb-[90px] max-[768px]:py-[38px] max-[768px]:pb-[60px]">
-          <div className="mx-auto w-[min(calc(100%-48px),1240px)] max-[960px]:w-[calc(100%-36px)] max-[680px]:w-[calc(100%-28px)]">
-            <div className="mb-[38px] flex items-center justify-between gap-6 max-[768px]:mb-[25px] max-[768px]:flex-col max-[768px]:items-start max-[768px]:gap-4">
-              <div className="flex items-baseline gap-[7px] text-[#77766e]">
-                <strong className="font-['Playfair_Display',serif] text-2xl text-[#263b21] max-[480px]:text-[21px]">
-                  {filteredProducts.length}
-                </strong>
+        {/* CATEGORY STRIP */}
+        <section className="sticky top-0 z-30 border-b border-[#293c24]/10 bg-[#faf8f2]/95 backdrop-blur-xl">
+          <div className="mx-auto w-[min(calc(100%-48px),1240px)] max-[680px]:w-[calc(100%-28px)]">
+            <div className="flex gap-2 overflow-x-auto py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <button
+                type="button"
+                onClick={() =>
+                  updateCategory('all')
+                }
+                className={`flex min-h-10 shrink-0 items-center rounded-full border px-4 text-xs font-semibold transition ${
+                  selectedCategory === 'all'
+                    ? 'border-[#496735] bg-[#496735] text-white'
+                    : 'border-[#293c24]/15 bg-transparent text-[#666960] hover:border-[#496735] hover:text-[#496735]'
+                }`}
+              >
+                All categories
+              </button>
 
-                <span className="text-[13px]">
-                  products
-                </span>
+              {categories.map(
+                (category, index) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() =>
+                      updateCategory(
+                        category.slug
+                      )
+                    }
+                    className={`flex min-h-10 shrink-0 items-center gap-2 rounded-full border py-1 pl-1 pr-4 text-xs font-semibold transition ${
+                      selectedCategory ===
+                      category.slug
+                        ? 'border-[#496735] bg-[#496735] text-white'
+                        : 'border-[#293c24]/15 bg-transparent text-[#666960] hover:border-[#496735] hover:text-[#496735]'
+                    }`}
+                  >
+                    <span className="h-8 w-8 overflow-hidden rounded-full">
+                      <img
+                        src={
+                          SHOP_CATEGORY_IMAGES[
+                            index %
+                              SHOP_CATEGORY_IMAGES.length
+                          ]
+                        }
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    </span>
+
+                    {category.name
+                      .split('(')[0]
+                      .trim()}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* PRODUCTS */}
+        <section className="py-10 sm:py-14 lg:py-16">
+          <div className="mx-auto w-[min(calc(100%-48px),1240px)] max-[680px]:w-[calc(100%-28px)]">
+            {/* TOOLBAR */}
+            <div className="mb-8 flex flex-col gap-4 border-b border-[#293c24]/10 pb-6 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-['Playfair_Display',Georgia,serif] text-2xl text-[#293d24]">
+                    {filteredProducts.length}
+                  </span>
+
+                  <span className="text-xs text-[#77786f]">
+                    products
+                  </span>
+                </div>
+
+                {(search ||
+                  selectedCategory !==
+                    'all') && (
+                  <p className="mt-1 text-xs text-[#898a82]">
+                    Showing results for your
+                    selection
+                  </p>
+                )}
               </div>
 
-              <div className="flex items-center gap-3 max-[768px]:w-full max-[768px]:flex-wrap">
-                <div className="flex h-[46px] w-[270px] items-center gap-[9px] rounded border border-[rgba(43,58,38,.14)] bg-white px-[13px] text-[#7a7a72] max-[768px]:h-12 max-[768px]:w-full">
-                  <Search size={17} />
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="flex h-11 w-full items-center gap-2 rounded border border-[#293c24]/12 bg-white px-3 text-[#77786f] sm:w-[280px]">
+                  <Search size={16} />
 
                   <input
-                    className="w-full min-w-0 border-0 bg-transparent text-[13px] text-[#333] outline-none"
-                    type="text"
                     value={search}
                     onChange={(event) =>
-                      handleSearch(event.target.value)
+                      handleSearch(
+                        event.target.value
+                      )
                     }
                     placeholder="Search products..."
+                    className="w-full bg-transparent text-xs text-[#30372c] outline-none placeholder:text-[#9a9a92]"
                   />
 
                   {search && (
                     <button
-                      className="flex border-0 bg-transparent text-[#777]"
-                      onClick={() => handleSearch('')}
+                      type="button"
+                      onClick={() =>
+                        handleSearch('')
+                      }
+                      className="shrink-0 text-[#77786f] transition hover:text-[#263c21]"
                       aria-label="Clear search"
                     >
                       <X size={15} />
@@ -384,213 +603,232 @@ export function ShopPage() {
                 </div>
 
                 <button
-                  className="hidden h-[46px] items-center justify-center gap-[7px] rounded border border-[#dcdcd4] bg-white px-[14px] text-[13px] text-[#4f5e48] max-[768px]:flex"
+                  type="button"
                   onClick={() =>
-                    setMobileFiltersOpen(true)
+                    setMobileFiltersOpen(
+                      true
+                    )
                   }
+                  className="flex h-11 items-center justify-center gap-2 rounded border border-[#293c24]/12 bg-white px-4 text-xs font-semibold text-[#4d5948] lg:hidden"
                 >
-                  <SlidersHorizontal size={17} />
+                  <SlidersHorizontal
+                    size={16}
+                  />
                   Filters
                 </button>
 
-                <div className="relative max-[768px]:flex-1">
+                <div className="relative">
                   <button
-                    className="flex h-[46px] items-center gap-[7px] rounded border border-[rgba(43,58,38,.14)] bg-white px-[14px] text-[13px] text-[#65665f] max-[768px]:w-full max-[768px]:justify-center"
+                    type="button"
                     onClick={() =>
-                      setShowSort((value) => !value)
+                      setSortOpen(
+                        (open) => !open
+                      )
                     }
+                    className="flex h-11 w-full items-center justify-between gap-3 rounded border border-[#293c24]/12 bg-white px-4 text-xs text-[#676960] sm:min-w-[190px]"
                   >
-                    <span>Sort:</span>
+                    <span>
+                      Sort:
+                    </span>
 
                     <strong className="font-semibold text-[#293d24]">
-                      {sortBy === 'price_asc'
-                        ? 'Price low to high'
-                        : sortBy === 'price_desc'
-                          ? 'Price high to low'
-                          : sortBy === 'rating'
-                            ? 'Top rated'
-                            : 'Featured'}
+                      {selectedSortLabel}
                     </strong>
 
-                    <ChevronDown size={16} />
+                    <ChevronDown
+                      size={15}
+                    />
                   </button>
 
-                  {showSort && (
-                    <div className="absolute right-0 top-[calc(100%+7px)] z-[50] w-[205px] rounded-md border border-[rgba(43,58,38,.1)] bg-white p-[7px] shadow-[0_16px_40px_rgba(30,40,24,.12)]">
-                      <button
-                        className="block w-full rounded px-3 py-[11px] text-left text-[13px] text-[#5f6258] hover:bg-[#f1f4ea] hover:text-[#42602f]"
-                        onClick={() => {
-                          setSortBy('featured');
-                          setShowSort(false);
-                        }}
-                      >
-                        Featured
-                      </button>
-
-                      <button
-                        className="block w-full rounded px-3 py-[11px] text-left text-[13px] text-[#5f6258] hover:bg-[#f1f4ea] hover:text-[#42602f]"
-                        onClick={() => {
-                          setSortBy('price_asc');
-                          setShowSort(false);
-                        }}
-                      >
-                        Price: Low to High
-                      </button>
-
-                      <button
-                        className="block w-full rounded px-3 py-[11px] text-left text-[13px] text-[#5f6258] hover:bg-[#f1f4ea] hover:text-[#42602f]"
-                        onClick={() => {
-                          setSortBy('price_desc');
-                          setShowSort(false);
-                        }}
-                      >
-                        Price: High to Low
-                      </button>
-
-                      <button
-                        className="block w-full rounded px-3 py-[11px] text-left text-[13px] text-[#5f6258] hover:bg-[#f1f4ea] hover:text-[#42602f]"
-                        onClick={() => {
-                          setSortBy('rating');
-                          setShowSort(false);
-                        }}
-                      >
-                        Top Rated
-                      </button>
+                  {sortOpen && (
+                    <div className="absolute right-0 top-[calc(100%+7px)] z-40 w-full min-w-[205px] rounded-lg border border-[#293c24]/10 bg-white p-1.5 shadow-[0_18px_50px_rgba(30,40,24,.14)]">
+                      {SORT_OPTIONS.map(
+                        ([value, label]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => {
+                              setSortBy(
+                                value
+                              );
+                              setSortOpen(
+                                false
+                              );
+                            }}
+                            className={`block w-full rounded px-3 py-2.5 text-left text-xs transition ${
+                              sortBy === value
+                                ? 'bg-[#edf3e8] font-bold text-[#496735]'
+                                : 'text-[#64675f] hover:bg-[#f4f5ef]'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        )
+                      )}
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-[235px_minmax(0,1fr)] gap-[46px] max-[1100px]:grid-cols-[205px_minmax(0,1fr)] max-[1100px]:gap-7 max-[768px]:block">
-              {/* DESKTOP FILTERS */}
-              <aside className="sticky top-[90px] self-start border border-[rgba(48,64,42,.1)] bg-[#fffdf8] p-[23px] max-[1100px]:p-[18px] max-[768px]:hidden">
-                <div className="flex items-start justify-between pb-5">
-                  <div>
-                    <span className="text-[11px] uppercase tracking-[1.5px] text-[#85847b]">
-                      Shop
-                    </span>
-
-                    <h3 className="mt-[5px] font-['Playfair_Display',serif] text-[22px] font-medium text-[#293e24]">
-                      Categories
-                    </h3>
-                  </div>
-
-                  <Filter
-                    size={18}
-                    className="text-[#587246]"
-                  />
-                </div>
-
-                <div className="flex flex-col [&>button]:flex [&>button]:items-center [&>button]:justify-between [&>button]:border-0 [&>button]:border-b [&>button]:border-[rgba(48,64,42,.07)] [&>button]:bg-transparent [&>button]:py-3 [&>button]:text-left [&>button]:text-[13px] [&>button]:text-[#6b6b63] [&>button]:transition-colors [&>button:hover]:text-[#466331]">
-                  <button
-                    className={
-                      selectedCategory === 'all'
-                        ? 'font-semibold text-[#466331]'
-                        : ''
-                    }
-                    onClick={() =>
-                      updateCategory('all')
-                    }
-                  >
-                    <span>All products</span>
-                    <ChevronRight size={15} />
-                  </button>
-
-                  {categories.map((category) => (
-                    <button
-                      key={category.id}
-                      className={
-                        selectedCategory === category.slug
-                          ? 'font-semibold text-[#466331]'
-                          : ''
-                      }
-                      onClick={() =>
-                        updateCategory(category.slug)
-                      }
-                    >
-                      <span>
-                        {category.name
-                          .split('(')[0]
-                          .trim()}
-                      </span>
-
-                      <ChevronRight size={15} />
-                    </button>
-                  ))}
-                </div>
-
-                <div className="my-6 h-px bg-[rgba(48,64,42,.1)]" />
-
-                <div className="bg-[#eef2e7] p-[17px] text-[#5d6a55]">
-                  <Leaf
-                    size={19}
-                    className="mb-2 text-[#577445]"
-                  />
-
-                  <strong className="mb-[5px] block text-[13px] text-[#405735]">
-                    Made with care
-                  </strong>
-
-                  <p className="m-0 text-[11px] leading-[1.65]">
-                    Traditional recipes, genuine ingredients and
-                    small-batch preparation.
-                  </p>
-                </div>
-              </aside>
-
-              {/* PRODUCTS */}
-              <div className="min-w-0">
-                {search && (
-                  <div className="mb-[23px] flex items-center gap-[6px] text-[13px] text-[#7a7971]">
-                    <span>
-                      Search results for
-                    </span>
-
-                    <strong className="text-[#344a2b]">
-                      “{search}”
-                    </strong>
+            {/* DESKTOP FILTER + GRID */}
+            <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
+              <aside className="hidden lg:block">
+                <div className="sticky top-[90px] rounded-xl border border-[#293c24]/10 bg-white p-5">
+                  <div className="mb-5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Filter
+                        size={16}
+                        className="text-[#496735]"
+                      />
+                      <h2 className="text-sm font-bold text-[#293d24]">
+                        Shop by category
+                      </h2>
+                    </div>
 
                     <button
-                      className="ml-2 border-0 bg-transparent text-xs text-[#56723f] underline"
-                      onClick={() =>
-                        handleSearch('')
-                      }
+                      type="button"
+                      onClick={clearFilters}
+                      className="text-[10px] font-semibold uppercase tracking-wide text-[#8a8b82] hover:text-[#496735]"
                     >
                       Clear
                     </button>
                   </div>
-                )}
 
-                {filteredProducts.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-x-5 gap-y-[27px] max-[1100px]:grid-cols-2 max-[768px]:gap-x-[11px] max-[768px]:gap-y-[22px] max-[480px]:gap-x-[9px] max-[480px]:gap-y-6">
-                    {filteredProducts.map((product) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        onOpenDetail={setSelectedProduct}
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateCategory(
+                          'all'
+                        )
+                      }
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs transition ${
+                        selectedCategory ===
+                        'all'
+                          ? 'bg-[#edf3e8] font-bold text-[#496735]'
+                          : 'text-[#686b63] hover:bg-[#f5f6f0]'
+                      }`}
+                    >
+                      All products
+                      <span>
+                        {products.length}
+                      </span>
+                    </button>
+
+                    {categories.map(
+                      (category) => {
+                        const count =
+                          products.filter(
+                            (product) =>
+                              product.category_id ===
+                                category.id ||
+                              product.category_slug ===
+                                category.slug
+                          ).length;
+
+                        return (
+                          <button
+                            key={
+                              category.id
+                            }
+                            type="button"
+                            onClick={() =>
+                              updateCategory(
+                                category.slug
+                              )
+                            }
+                            className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs transition ${
+                              selectedCategory ===
+                              category.slug
+                                ? 'bg-[#edf3e8] font-bold text-[#496735]'
+                                : 'text-[#686b63] hover:bg-[#f5f6f0]'
+                            }`}
+                          >
+                            <span>
+                              {category.name
+                                .split(
+                                  '('
+                                )[0]
+                                .trim()}
+                            </span>
+
+                            <span className="text-[10px] text-[#999b92]">
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      }
+                    )}
+                  </div>
+
+                  <div className="mt-6 border-t border-[#293c24]/10 pt-5">
+                    <div className="rounded-lg bg-[#f5f2e8] p-4">
+                      <Leaf
+                        size={19}
+                        className="text-[#496735]"
                       />
-                    ))}
+
+                      <p className="mt-3 text-xs font-semibold text-[#33452c]">
+                        Traditional food,
+                        thoughtfully made.
+                      </p>
+
+                      <p className="mt-1 text-[11px] leading-5 text-[#77786f]">
+                        Small-batch goodness
+                        for everyday
+                        kitchens.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+
+              <div>
+                {filteredProducts.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-2 sm:gap-x-5 sm:gap-y-10 xl:grid-cols-3">
+                    {filteredProducts.map(
+                      (product) => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          onOpenDetail={
+                            setSelectedProduct
+                          }
+                        />
+                      )
+                    )}
                   </div>
                 ) : (
-                  <div className="flex min-h-[430px] flex-col items-center justify-center text-center max-[480px]:min-h-[350px]">
-                    <div className="flex h-[74px] w-[74px] items-center justify-center rounded-full bg-[#edf1e8] text-[#587346]">
-                      <ShoppingBag size={34} />
+                  <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#293c24]/15 bg-white px-6 text-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#edf3e8] text-[#496735]">
+                      <Search size={24} />
                     </div>
 
-                    <h2 className="my-[22px] mb-2 font-['Playfair_Display',serif] text-[28px] text-[#2c4026]">
-                      Nothing found
+                    <h2 className="mt-5 font-['Playfair_Display',Georgia,serif] text-3xl text-[#293d24]">
+                      No products found
                     </h2>
 
-                    <p className="mb-5 text-sm text-[#77766f]">
-                      We couldn't find products matching your selection.
+                    <p className="mt-2 max-w-[420px] text-sm leading-6 text-[#77786f]">
+                      We couldn't find
+                      anything matching
+                      your current filters.
+                      Try another search
+                      or browse the full
+                      collection.
                     </p>
 
                     <button
-                      className="rounded-[3px] bg-[#496735] px-5 py-3 text-white"
-                      onClick={clearFilters}
+                      type="button"
+                      onClick={
+                        clearFilters
+                      }
+                      className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#496735] px-5 py-3 text-xs font-bold text-white transition hover:bg-[#3d592e]"
                     >
                       View all products
+                      <ArrowRight
+                        size={15}
+                      />
                     </button>
                   </div>
                 )}
@@ -599,50 +837,37 @@ export function ShopPage() {
           </div>
         </section>
 
-        {/* SHOP STORY BANNER */}
-        <section className="pb-[100px] max-[768px]:pb-[60px]">
-          <div className="mx-auto w-[min(calc(100%-48px),1240px)] max-[960px]:w-[calc(100%-36px)] max-[680px]:w-[calc(100%-28px)]">
-            <div className="grid min-h-[490px] grid-cols-2 overflow-hidden bg-[#e7ebdf] max-[768px]:min-h-0 max-[768px]:grid-cols-1">
-              <div className="min-h-[490px] max-[768px]:min-h-[280px]">
-                <img
-                  className="h-full w-full object-cover"
-                  src={
-                    products[0]?.images?.[0] ||
-                    SHOP_CATEGORY_IMAGES[0]
-                  }
-                  alt="Traditional ManaDeshi food"
-                  loading="lazy"
-                />
-              </div>
+        {/* STORY STRIP */}
+        <section className="border-y border-[#293c24]/10 bg-[#283b23] px-5 py-12 text-white sm:py-16">
+          <div className="mx-auto grid w-full max-w-[1080px] items-center gap-8 md:grid-cols-[1fr_auto]">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#d8b47d]">
+                ManaDeshi Dukaan
+              </span>
 
-              <div className="flex flex-col items-start justify-center p-[70px] max-[1100px]:p-12 max-[768px]:px-[25px] max-[768px]:py-[42px] max-[768px]:pb-12 max-[480px]:px-5 max-[480px]:py-9 max-[480px]:pb-[42px]">
-                <span className="text-[9px] font-extrabold uppercase tracking-[.16em] text-[var(--md-orange)]">
-                  A taste of home
-                </span>
+              <h2 className="mt-2 max-w-[650px] font-['Playfair_Display',Georgia,serif] text-3xl leading-tight sm:text-5xl">
+                Bring a little
+                <em className="not-italic text-[#a9c5ae]">
+                  {' '}
+                  home
+                </em>{' '}
+                to your table.
+              </h2>
 
-                <h2 className="my-[13px] mb-5 font-['Playfair_Display',serif] text-[clamp(34px,4vw,52px)] font-normal leading-[1.05] text-[#2d4327] max-[768px]:text-[38px] max-[480px]:text-[34px]">
-                  Simple ingredients.
-                  <br />
-                  <em className="block italic text-[#688052]">
-                    Beautiful food.
-                  </em>
-                </h2>
-
-                <p className="mb-7 max-w-[480px] text-[15px] leading-[1.8] text-[#687062] max-[768px]:text-sm">
-                  Every ManaDeshi product begins with the belief that
-                  traditional food should taste as familiar as the food
-                  made at home.
-                </p>
-
-                <Link
-                  to="/about"
-                  className="inline-flex min-h-[47px] w-fit items-center gap-[9px] rounded-full border border-[var(--md-green)] bg-[var(--md-green)] px-[19px] text-[11px] font-extrabold text-white no-underline transition-transform duration-200 hover:-translate-y-0.5 hover:bg-[var(--md-green-dark)]"
-                >
-                  Discover our story
-                  <ChevronRight size={17} />
-                </Link>
-              </div>
+              <p className="mt-3 max-w-[580px] text-sm leading-6 text-white/65">
+                Traditional foods,
+                thoughtfully made for
+                everyday homes.
+              </p>
             </div>
+
+            <Link
+              to="/gifting"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-xs font-bold text-[#496735] transition hover:-translate-y-0.5 hover:bg-[#eef4eb]"
+            >
+              Explore gifting
+              <ArrowRight size={15} />
+            </Link>
           </div>
         </section>
 
@@ -651,134 +876,161 @@ export function ShopPage() {
 
       {/* MOBILE FILTER DRAWER */}
       {mobileFiltersOpen && (
-        <div
-          className="fixed inset-0 z-[200] flex justify-end bg-[rgba(25,32,22,.42)]"
-          onClick={() =>
-            setMobileFiltersOpen(false)
-          }
-        >
-          <aside
-            className="flex h-full w-[min(390px,90vw)] animate-[shopDrawerIn_.25s_ease_forwards] flex-col bg-[#fffdf8] shadow-[-15px_0_50px_rgba(20,30,20,.16)]"
-            onClick={(event) =>
-              event.stopPropagation()
+        <div className="fixed inset-0 z-[100] lg:hidden">
+          <button
+            type="button"
+            aria-label="Close filters"
+            onClick={() =>
+              setMobileFiltersOpen(
+                false
+              )
             }
-          >
-            <div className="flex items-center justify-between border-b border-[#e7e5dd] px-[22px] py-[26px]">
-              <div>
-                <span className="text-[11px] uppercase tracking-[1.5px] text-[#7d7d73]">
-                  Shop
-                </span>
+            className="absolute inset-0 bg-black/40"
+          />
 
-                <h2 className="mt-1 font-['Playfair_Display',serif] text-[26px] font-medium text-[#293d24]">
+          <aside className="absolute bottom-0 left-0 right-0 max-h-[88dvh] overflow-y-auto rounded-t-3xl bg-[#fffdf8] shadow-2xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-[#293c24]/10 bg-[#fffdf8] px-5 py-4">
+              <div>
+                <h2 className="font-['Playfair_Display',Georgia,serif] text-2xl text-[#293d24]">
                   Filters
                 </h2>
+                <p className="mt-0.5 text-[11px] text-[#85867d]">
+                  Refine your collection
+                </p>
               </div>
 
               <button
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-[#deded5] bg-white text-[#4c4d47]"
+                type="button"
                 onClick={() =>
-                  setMobileFiltersOpen(false)
+                  setMobileFiltersOpen(
+                    false
+                  )
                 }
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f0f2eb] text-[#596253]"
               >
-                <X size={20} />
+                <X size={17} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-[22px] py-[25px]">
-              <span className="mb-2.5 block text-[11px] font-semibold uppercase tracking-[1.2px] text-[#77776e]">
+            <div className="px-5 py-5">
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-[#6d7067]">
                 Categories
-              </span>
+              </h3>
 
-              <button
-                className={`block w-full border-0 border-b border-[#eceae2] bg-transparent py-[14px] text-left text-sm text-[#686861] ${
-                  selectedCategory === 'all'
-                    ? 'font-bold text-[#496735]'
-                    : ''
-                }`}
-                onClick={() =>
-                  updateCategory('all')
-                }
-              >
-                All products
-              </button>
-
-              {categories.map((category) => (
+              <div className="space-y-1">
                 <button
-                  key={category.id}
-                  className={`block w-full border-0 border-b border-[#eceae2] bg-transparent py-[14px] text-left text-sm text-[#686861] ${
-                    selectedCategory === category.slug
-                      ? 'font-bold text-[#496735]'
-                      : ''
-                  }`}
+                  type="button"
                   onClick={() =>
-                    updateCategory(category.slug)
+                    updateCategory(
+                      'all'
+                    )
                   }
-                >
-                  {category.name
-                    .split('(')[0]
-                    .trim()}
-                </button>
-              ))}
-
-              <div className="my-[25px] h-px bg-[#e4e3db]" />
-
-              <span className="mb-2.5 block text-[11px] font-semibold uppercase tracking-[1.2px] text-[#77776e]">
-                Sort by
-              </span>
-
-              {[
-                ['featured', 'Featured'],
-                ['price_asc', 'Price: Low to High'],
-                ['price_desc', 'Price: High to Low'],
-                ['rating', 'Top Rated'],
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  className={`block w-full border-0 border-b border-[#eceae2] bg-transparent py-[14px] text-left text-sm text-[#686861] ${
-                    sortBy === value
-                      ? 'font-bold text-[#496735]'
-                      : ''
+                  className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm ${
+                    selectedCategory ===
+                    'all'
+                      ? 'bg-[#496735] font-bold text-white'
+                      : 'bg-white text-[#5f6259]'
                   }`}
-                  onClick={() => {
-                    setSortBy(value);
-                    setMobileFiltersOpen(false);
-                  }}
                 >
-                  {label}
+                  All products
+                  <span>
+                    {products.length}
+                  </span>
                 </button>
-              ))}
+
+                {categories.map(
+                  (category) => (
+                    <button
+                      key={category.id}
+                      type="button"
+                      onClick={() =>
+                        updateCategory(
+                          category.slug
+                        )
+                      }
+                      className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm ${
+                        selectedCategory ===
+                        category.slug
+                          ? 'bg-[#496735] font-bold text-white'
+                          : 'bg-white text-[#5f6259]'
+                      }`}
+                    >
+                      <span>
+                        {category.name
+                          .split(
+                            '('
+                          )[0]
+                          .trim()}
+                      </span>
+
+                      <ChevronRight
+                        size={15}
+                      />
+                    </button>
+                  )
+                )}
+              </div>
+
+              <h3 className="mb-3 mt-7 text-xs font-bold uppercase tracking-[0.14em] text-[#6d7067]">
+                Sort by
+              </h3>
+
+              <div className="grid gap-2">
+                {SORT_OPTIONS.map(
+                  ([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() =>
+                        setSortBy(value)
+                      }
+                      className={`rounded-xl border px-4 py-3 text-left text-sm ${
+                        sortBy === value
+                          ? 'border-[#496735] bg-[#edf3e8] font-bold text-[#496735]'
+                          : 'border-[#293c24]/10 bg-white text-[#64675f]'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  )
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-cols-[1fr_1.5fr] gap-2.5 border-t border-[#e4e3db] bg-[#fffdf8] px-[22px] py-[17px]">
+            <div className="sticky bottom-0 grid grid-cols-[1fr_1.5fr] gap-2 border-t border-[#293c24]/10 bg-[#fffdf8] px-5 py-4">
               <button
-                className="h-[47px] rounded-[3px] border border-[#d9d9d1] bg-white text-[13px] text-[#5f6259]"
+                type="button"
                 onClick={clearFilters}
+                className="rounded-xl border border-[#293c24]/15 bg-white text-xs font-semibold text-[#60635a]"
               >
                 Clear all
               </button>
 
               <button
-                className="h-[47px] rounded-[3px] border-0 bg-[#496735] text-[13px] text-white"
+                type="button"
                 onClick={() =>
-                  setMobileFiltersOpen(false)
+                  setMobileFiltersOpen(
+                    false
+                  )
                 }
+                className="rounded-xl bg-[#496735] text-xs font-bold text-white"
               >
-                Show {filteredProducts.length} products
+                Show {filteredProducts.length}{' '}
+                products
               </button>
             </div>
           </aside>
         </div>
       )}
 
-      {/* PRODUCT DETAIL */}
       <ProductDetailModal
         product={selectedProduct}
         onClose={() =>
           setSelectedProduct(null)
         }
-        onBuyNow={() => {
-          setSelectedProduct(null);
-        }}
+        onBuyNow={() =>
+          setSelectedProduct(null)
+        }
       />
     </div>
   );

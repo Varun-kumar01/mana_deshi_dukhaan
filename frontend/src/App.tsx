@@ -1,46 +1,22 @@
-import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+
 import { AuthProvider } from './context/AuthContext';
-import { CartProvider, useCart } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
-import { AuthModal } from './components/AuthModal';
-import { CartDrawer } from './components/CartDrawer';
-import { AboutPage } from './pages/AboutPage';
-import { AccountPage } from './pages/AccountPage';
-import { CartPage } from './pages/CartPage';
-import { CategoryPage } from './pages/CategoryPage';
-import { CheckoutPage } from './pages/CheckoutPage';
-import { ContactPage } from './pages/ContactPage';
+import { CartProvider } from './context/CartContext';
+
 import { HomePage } from './pages/HomePage';
-import { ProductPage } from './pages/ProductPage';
 import { ShopPage } from './pages/ShopPage';
+import { CategoryPage } from './pages/CategoryPage';
+import { ProductPage } from './pages/ProductPage';
+import { AboutPage } from './pages/AboutPage';
 import { WhyUsPage } from './pages/WhyUsPage';
+import { ContactPage } from './pages/ContactPage';
 import { WishlistPage } from './pages/WishlistPage';
-
-function AppRoutes() {
-  const navigate = useNavigate();
-  const { setIsCartOpen } = useCart();
-
-  return (
-    <>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/shop" element={<ShopPage />} />
-        <Route path="/category/:slug" element={<CategoryPage />} />
-        <Route path="/product/:id" element={<ProductPage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/why-us" element={<WhyUsPage />} />
-        <Route path="/contact" element={<ContactPage />} />
-        <Route path="/wishlist" element={<WishlistPage />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/account/*" element={<AccountPage />} />
-        <Route path="*" element={<HomePage />} />
-      </Routes>
-      <AuthModal onAdminAccess={() => navigate('/account')} />
-      <CartDrawer onProceedToCheckout={() => { setIsCartOpen(false); navigate('/checkout'); }} />
-    </>
-  );
-}
+import { CartPage } from './pages/CartPage';
+import { CheckoutPage } from './pages/CheckoutPage';
+import { AccountPage } from './pages/AccountPage';
+import { GiftingPage } from './pages/GiftingPage';
+import { B2BPage } from './pages/B2BPage';
 
 export function App() {
   return (
@@ -48,7 +24,84 @@ export function App() {
       <AuthProvider>
         <WishlistProvider>
           <CartProvider>
-            <AppRoutes />
+            <Routes>
+              {/* Main storefront */}
+              <Route path="/" element={<HomePage />} />
+
+              {/* Shopping */}
+              <Route path="/shop" element={<ShopPage />} />
+              <Route
+                path="/category/:slug"
+                element={<CategoryPage />}
+              />
+              <Route
+                path="/product/:id"
+                element={<ProductPage />}
+              />
+
+              {/* Collections / discovery */}
+              <Route path="/gifting" element={<GiftingPage />} />
+              {/* <Route
+                path="/gifting/:id"
+                element={<ProductPage />}
+              /> */}
+
+              <Route path="/gifting/:id" element={<ProductPage />} />
+              
+              <Route path="/b2b" element={<B2BPage />} />
+
+              {/* Brand */}
+              <Route
+                path="/our-story"
+                element={<AboutPage />}
+              />
+              <Route
+                path="/about"
+                element={<AboutPage />}
+              />
+              <Route
+                path="/why-us"
+                element={<WhyUsPage />}
+              />
+
+              {/* Content */}
+              <Route
+                path="/blogs"
+                element={<WhyUsPage />}
+              />
+              <Route
+                path="/faqs"
+                element={<ContactPage />}
+              />
+              <Route
+                path="/contact"
+                element={<ContactPage />}
+              />
+
+              {/* Customer */}
+              <Route
+                path="/wishlist"
+                element={<WishlistPage />}
+              />
+              <Route
+                path="/cart"
+                element={<CartPage />}
+              />
+              <Route
+                path="/checkout"
+                element={<CheckoutPage />}
+              />
+              <Route
+                path="/account/*"
+                element={<AccountPage />}
+              />
+
+              {/* Legacy compatibility */}
+              <Route
+                path="*"
+                element={<HomePage />}
+              />
+            </Routes>
           </CartProvider>
         </WishlistProvider>
       </AuthProvider>
